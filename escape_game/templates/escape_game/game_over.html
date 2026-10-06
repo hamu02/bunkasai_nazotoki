@@ -1,0 +1,26 @@
+{% extends 'escape_game/base.html' %}
+{% load static %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'escape_game/css/game_over.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="over-wrapper">
+    <div class="over-card">
+        <div class="skull-icon">💀</div>
+        <div><span class="over-badge">TIME UP</span></div>
+        <h1 class="over-title">GAME OVER</h1>
+        
+        <div class="divider"></div>
+
+        <div class="team-highlight">
+            チーム <span class="team-name">「{{ team.name }}」</span>
+        </div>
+        <p class="over-desc">
+            制限時間が終了しました…<br>
+            迷宮の深い闇に呑まれ、脱出することはできなかった。
+        </p>
+    </div>
+</div>
+{% endblock %}

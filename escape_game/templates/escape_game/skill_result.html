@@ -1,0 +1,9 @@
+{% extends 'escape_game/base.html' %}
+
+{% block content %}
+<div class="result-container">
+    <h1>魔法発動</h1>
+    <p class="result-message">{{ message }}</p>
+    <a href="{% url 'player' %}" class="back-btn">プレイヤー画面へ戻る</a>
+</div>
+{% endblock %}

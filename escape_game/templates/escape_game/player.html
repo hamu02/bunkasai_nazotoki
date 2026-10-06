@@ -1,0 +1,43 @@
+{% extends 'escape_game/base.html' %}
+
+{% block content %}
+<div class="game-container">
+    <header class="game-header">
+        <h2>チーム: {{ team.name }}</h2>
+        <div class="stage-badge">STAGE {{ team.current_stage }}</div>
+    </header>
+
+    {% if mystery %}
+        <main class="mystery-card">
+            <h3 class="mystery-title">{{ mystery.title }}</h3>
+            
+            <div class="mystery-statement">
+                {{ mystery.statement|safe }}
+            </div>
+
+            {% if mystery.image %}
+                <div class="mystery-image">
+                    <img src="{{ mystery.image.url }}" alt="謎の画像">
+                </div>
+            {% endif %}
+
+            {% if error_message %}
+                <div class="error-message">
+                    {{ error_message }}
+                </div>
+            {% endif %}
+
+            <form method="POST" class="answer-form">
+                {% csrf_token %}
+                <input type="text" name="answer" placeholder="答えを入力..." required autocomplete="off">
+                <button type="submit" class="submit-btn">回答する</button>
+            </form>
+        </main>
+    {% else %}
+        <main class="game-clear-card">
+            <h2>GAME CLEAR!</h2>
+            <p>すべての謎を解き明かした！本の世界から無事に脱出成功だ！</p>
+        </main>
+    {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,104 @@
+body {
+    background-color: #1a120c;
+    color: #e8ded4;
+    font-family: 'Georgia', 'Yu Mincho', serif;
+    margin: 0;
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.start-wrapper {
+    width: 100%;
+    max-width: 480px;
+    padding: 20px;
+}
+
+.start-card {
+    background: #2a1f17;
+    border: 2px solid #d4af37;
+    border-radius: 16px;
+    padding: 40px 30px;
+    text-align: center;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7), inset 0 0 15px rgba(212, 175, 55, 0.15);
+    position: relative;
+}
+
+.book-decoration {
+    font-size: 2.5rem;
+    margin-bottom: 10px;
+}
+
+.start-title {
+    color: #d4af37;
+    font-size: 1.8rem;
+    margin: 0 0 12px 0;
+    letter-spacing: 1.5px;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
+}
+
+.start-subtitle {
+    color: #c5b5a5;
+    font-size: 0.95rem;
+    margin-bottom: 30px;
+    line-height: 1.5;
+}
+
+.start-form {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+}
+
+.form-group input {
+    width: 100%;
+    box-sizing: border-box;
+    background-color: #120b07;
+    border: 2px solid #8b0000;
+    border-radius: 8px;
+    padding: 14px 16px;
+    color: #fbe8a6;
+    font-size: 1.05rem;
+    text-align: center;
+    outline: none;
+    transition: all 0.3s;
+}
+
+.form-group input:focus {
+    border-color: #d4af37;
+    box-shadow: 0 0 10px rgba(212, 175, 55, 0.4);
+}
+
+.start-btn {
+    background: linear-gradient(135deg, #8b0000, #5c0000);
+    color: #fbe8a6;
+    border: 1px solid #d4af37;
+    border-radius: 8px;
+    padding: 14px;
+    font-size: 1.1rem;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.2s;
+    letter-spacing: 1px;
+}
+
+.start-btn:hover {
+    background: linear-gradient(135deg, #a00000, #700000);
+    box-shadow: 0 0 12px rgba(212, 175, 55, 0.5);
+    transform: translateY(-2px);
+}
+
+.start-btn:active {
+    transform: translateY(0);
+}
+
+.error-msg {
+    color: #ff6b6b;
+    background: rgba(139, 0, 0, 0.3);
+    border: 1px solid #8b0000;
+    padding: 10px;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    margin-bottom: 20px;
+}

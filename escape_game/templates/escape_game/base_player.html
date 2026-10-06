@@ -1,0 +1,92 @@
+{% extends 'escape_game/base.html' %}
+{% load static %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'escape_game/css/base_player.css' %}">
+{% block theme_css %}{% endblock %}
+{% endblock %}
+
+{% block content %}
+<div class="game-wrapper {% block theme_class %}theme-normal{% endblock %}" data-team-name="{{ team.name }}">
+    <div id="effect-canvas"></div>
+
+    <!-- 1. 最上部ヘッダー -->
+    <header class="main-header">
+        <div class="header-left">
+            <span class="book-icon">📖</span>
+            <h1 class="game-title">大魔導書の迷宮</h1>
+        </div>
+        <div class="header-right">
+            <span class="badge team-badge">👥 {{ team.name }}</span>
+            <span class="badge element-badge">
+                {% block element_badge %}📖 {{ team.get_element_display }}{% endblock %}
+            </span>
+        </div>
+    </header>
+
+    <!-- 2. 上部ステータスエリア -->
+    <div class="status-grid">
+        <!-- 残り時間タイマー -->
+        <div class="status-card timer-card">
+            <div class="card-label">脱出までの残り時間</div>
+            <div class="timer-display">
+                <span class="hourglass">⏳</span>
+                <span id="player-timer">--:--</span>
+                <span class="status-tag">進行中</span>
+            </div>
+        </div>
+
+        <!-- スキル状態 -->
+        <div class="status-card skill-card">
+            <div class="skill-info">
+                {% block skill_content %}
+                <div class="skill-title">魔法スキル【未解放】</div>
+                <div class="skill-desc">杖をかざして属性を獲得してください</div>
+                {% endblock %}
+            </div>
+        </div>
+    </div>
+
+    <!-- 3. メイン謎エリア（羊皮紙） -->
+    {% if mystery %}
+        <main class="main-mystery-card">
+            <div class="stage-info">
+                <span class="checkpoint-text">チェックポイント {{ team.current_stage }} / 4</span>
+                <h2 class="mystery-title">第{{ team.current_stage }}章: {{ mystery.title }}</h2>
+            </div>
+
+            <div class="statement-box">
+                {{ mystery.statement|safe }}
+            </div>
+
+            {% if mystery.image %}
+                <div class="parchment-area">
+                    <div class="parchment-content">
+                        <img src="{{ mystery.image.url }}" alt="挿絵">
+                    </div>
+                </div>
+            {% endif %}
+
+            {% if error_message %}
+                <div class="error-message">
+                    {{ error_message }}
+                </div>
+            {% endif %}
+
+            <!-- 謎の回答フォーム -->
+            <form method="POST" class="answer-form">
+                {% csrf_token %}
+                <label for="ans-input" class="input-label">呪文（答え）を入力</label>
+                <div class="input-group">
+                    <input type="text" id="ans-input" name="answer" placeholder="答えを入力..." required autocomplete="off">
+                    <button type="submit" class="cast-btn">詠唱 ⚡</button>
+                </div>
+            </form>
+        </main>
+    {% endif %}
+</div>
+
+{% block extra_js %}
+<script src="{% static 'escape_game/js/player.js' %}"></script>
+{% endblock %}
+{% endblock %}

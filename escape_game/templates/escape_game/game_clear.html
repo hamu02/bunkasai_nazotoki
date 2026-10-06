@@ -1,0 +1,32 @@
+{% extends 'escape_game/base.html' %}
+{% load static %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'escape_game/css/game_clear.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="clear-wrapper">
+    <canvas id="particles-canvas"></canvas>
+
+    <div class="clear-card">
+        <div class="trophy-icon">🏆</div>
+        <div><span class="clear-badge">MISSION COMPLETE</span></div>
+        <h1 class="clear-title">GAME CLEAR!</h1>
+        
+        <div class="divider"></div>
+
+        <div class="team-highlight">
+            チーム <span class="team-name">「{{ team.name }}」</span>
+        </div>
+        <p class="clear-desc">
+            見事にすべての謎を解き明かし、<br>
+            大魔導書の迷宮から脱出を果たしました！
+        </p>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'escape_game/js/game_clear.js' %}"></script>
+{% endblock %}

@@ -1,0 +1,28 @@
+{% extends 'escape_game/base.html' %}
+{% load static %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'escape_game/css/start.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="start-wrapper">
+    <div class="start-card">
+        <div class="book-decoration">📜</div>
+        <h1 class="start-title">魔法図書館からの脱出</h1>
+        <p class="start-subtitle">合言葉を入力して、本の世界へ入り込め！</p>
+
+        {% if error_message %}
+            <div class="error-msg">⚠️ {{ error_message }}</div>
+        {% endif %}
+
+        <form method="POST" class="start-form">
+            {% csrf_token %}
+            <div class="form-group">
+                <input type="text" name="passcode" placeholder="チームの合言葉を入力..." required autocomplete="off">
+            </div>
+            <button type="submit" class="start-btn">ゲーム開始 ✦</button>
+        </form>
+    </div>
+</div>
+{% endblock %}

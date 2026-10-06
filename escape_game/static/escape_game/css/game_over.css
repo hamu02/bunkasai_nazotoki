@@ -1,0 +1,88 @@
+.over-wrapper {
+    min-height: 85vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    position: relative;
+    overflow: hidden;
+    background: radial-gradient(circle at center, #2a080c 0%, #050102 100%);
+}
+
+.over-card {
+    position: relative;
+    z-index: 2;
+    background: rgba(20, 10, 12, 0.9);
+    border: 2px solid #ff3366;
+    border-radius: 20px;
+    padding: 40px 30px;
+    max-width: 500px;
+    width: 90%;
+    text-align: center;
+    box-shadow: 0 0 30px rgba(255, 51, 102, 0.3), inset 0 0 20px rgba(255, 51, 102, 0.15);
+    backdrop-filter: blur(10px);
+    animation: fadeIn 1s ease-out forwards;
+}
+
+@keyframes fadeIn {
+    0% { opacity: 0; transform: translateY(20px); }
+    100% { opacity: 1; transform: translateY(0); }
+}
+
+.over-badge {
+    display: inline-block;
+    padding: 6px 16px;
+    background: rgba(255, 51, 102, 0.15);
+    border: 1px solid #ff3366;
+    border-radius: 20px;
+    color: #ff3366;
+    font-weight: bold;
+    font-size: 0.9rem;
+    letter-spacing: 2px;
+    margin-bottom: 15px;
+}
+
+.over-title {
+    font-size: 3.2rem;
+    font-weight: 900;
+    margin: 0;
+    color: #ff3366;
+    text-shadow: 0 0 15px rgba(255, 51, 102, 0.7);
+    letter-spacing: 4px;
+    animation: pulseGlitch 2s infinite alternate;
+}
+
+@keyframes pulseGlitch {
+    0% { text-shadow: 0 0 15px rgba(255, 51, 102, 0.7); }
+    100% { text-shadow: 0 0 30px rgba(255, 51, 102, 1), 0 0 5px #fff; }
+}
+
+.divider {
+    height: 2px;
+    background: linear-gradient(90deg, transparent, #ff3366, transparent);
+    margin: 25px 0;
+}
+
+.team-highlight {
+    font-size: 1.3rem;
+    color: #e2e8f0;
+    margin-bottom: 15px;
+}
+
+.team-name {
+    color: #ff3366;
+    font-weight: bold;
+    font-size: 1.5rem;
+}
+
+.over-desc {
+    color: #94a3b8;
+    line-height: 1.8;
+    font-size: 0.98rem;
+}
+
+.skull-icon {
+    font-size: 4rem;
+    margin-bottom: 10px;
+    display: inline-block;
+    filter: drop-shadow(0 0 10px rgba(255, 51, 102, 0.5));
+}

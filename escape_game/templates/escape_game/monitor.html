@@ -1,0 +1,37 @@
+{% extends 'escape_game/base.html' %}
+{% load static %}
+
+{% block content %}
+<link rel="stylesheet" href="{% static 'escape_game/css/monitor.css' %}">
+
+<div class="monitor-container" 
+     id="monitor-box" 
+     data-team-name="{{ team.name }}" 
+     data-remaining-seconds="{{ team.remaining_seconds }}" 
+     data-is-paused="{% if team.is_paused %}true{% else %}false{% endif %}">
+     
+    <div class="team-title">{{ team.name }}</div>
+
+    <div class="status-grid">
+        <div class="status-card">
+            <div class="card-label">CURRENT STAGE</div>
+            <div class="stage-value" id="current-stage">STAGE {{ team.current_stage }}</div>
+        </div>
+
+        <div class="status-card timer-card">
+            <div class="card-label">TIME REMAINING</div>
+            <div class="timer-display" id="timer-display">--:--</div>
+        </div>
+    </div>
+</div>
+
+<!-- 2. モニター用 全画面クリア演出（初期状態は hidden で隠す） -->
+<div id="monitor-clear-screen" class="monitor-overlay hidden">
+    <div class="overlay-trophy">🏆</div>
+    <div class="overlay-badge clear">MISSION COMPLETE</div>
+    <h1 class="overlay-title clear">GAME CLEAR!</h1>
+    <div class="overlay-team">チーム <span>「{{ team.name }}」</span> 脱出成功！</div>
+</div>
+
+<script src="{% static 'escape_game/js/monitor.js' %}"></script>
+{% endblock %}
