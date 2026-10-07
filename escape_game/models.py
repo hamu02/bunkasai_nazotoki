@@ -2,8 +2,16 @@ from django.db import models
 from django.utils import timezone
 
 class Team(models.Model):
+    ELEMENT_CHOICES = [
+        ('none', '未設定'),
+        ('time', '時間'),
+        ('water', '水'),
+        ('grass', '草'),
+        ('fire', '炎'),
+        ('ice', '氷'),
+    ]
     name = models.CharField(max_length=100, unique=True)
-    element = models.CharField(max_length=20, default='none') # 属性・役職
+    element = models.CharField(max_length=20, choices=ELEMENT_CHOICES, default='none')
     current_stage = models.IntegerField(default=1)
     
     # 時間管理用（30分 ＝ 1800秒）

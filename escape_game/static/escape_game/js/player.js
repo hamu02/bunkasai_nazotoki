@@ -7,6 +7,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let targetTimestamp = null;
     let isPaused = false;
     let remainingSecondsWhenPaused = 0;
+    let isRedirecting = false;
 
     // タイマー描画機能
     function renderTimer() {
@@ -48,8 +49,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 // 🔻 判定結果に応じてクリア画面・ゲームオーバー画面へ自動遷移
                 if (data.is_cleared) {
+                    isRedirecting = true;
                     window.location.href = '/game_clear/';
                 } else if (data.is_game_over) {
+                    isRedirecting = true;
                     window.location.href = '/game_over/';
                 }
             }

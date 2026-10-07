@@ -48,7 +48,12 @@ def player_view(request):
         else:
             error_message = "答えが違うようだ..."
 
-    return render(request, 'escape_game/player_normal.html', {
+    template_name = 'escape_game/player_normal.html' # 通常/未設定時
+    if team.element == 'time':
+        template_name = 'escape_game/player_time.html' # 時間属性用
+    # ※今後「水」「火」などが増えたらここに追加
+
+    return render(request, template_name, {
         'team': team,
         'mystery': current_mystery,
         'error_message': error_message,
@@ -133,3 +138,15 @@ def trigger_skill_nfc(request, team_name, element):
         msg = "魔法の発動に失敗した…（属性不一致、または使用済み）"
 
     return render(request, 'escape_game/skill_result.html', {'message': msg})
+
+# views.py
+
+def game_over_view(request):
+    team_name = request.session.get('team_name')
+    team = get_object_or_404(Team, name=team_name) if team_name else None
+    return render(request, 'escape_game/game_over.html', {'team': team})
+
+def game_clear_view(request):
+    team_name = request.session.get('team_name')
+    team = get_object_or_404(Team, name=team_name) if team_name else None
+    return render(request, 'escape_game/game_clear.html', {'team': team})

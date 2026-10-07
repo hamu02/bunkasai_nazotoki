@@ -1,0 +1,17 @@
+{% extends 'escape_game/base_player.html' %}
+{% load static %}
+
+{% block theme_class %}theme-time{% endblock %}
+
+{% block element_badge %}⏳ 時間の魔法使い{% endblock %}
+
+{% block skill_content %}
+<div class="skill-title">魔法スキル【時空操作】</div>
+<div class="skill-desc">刻を戻し、制限時間を巻き戻す能力</div>
+{% endblock %}
+
+{% block extra_js %}
+<!-- 通常のプレイヤー制御JSと、時間属性用のCanvas演出JSを両方読み込む -->
+<script src="{% static 'escape_game/js/player.js' %}"></script>
+<script src="{% static 'escape_game/js/time_theme.js' %}"></script>
+{% endblock %}

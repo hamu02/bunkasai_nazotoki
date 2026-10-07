@@ -1,9 +1,30 @@
-{% extends 'escape_game/base.html' %}
+{% extends 'escape_game/base_player.html' %}
 
 {% block content %}
-<div class="result-container">
-    <h1>魔法発動</h1>
-    <p class="result-message">{{ message }}</p>
-    <a href="{% url 'player' %}" class="back-btn">プレイヤー画面へ戻る</a>
+<div style="text-align: center; padding: 40px 20px;">
+    <h2 style="font-size: 1.5rem; color: #ffd700; margin-bottom: 20px;">
+        ✨ 魔法発動 ✨
+    </h2>
+    <p style="font-size: 1.2rem; font-weight: bold; margin-bottom: 30px;">
+        {{ message }}
+    </p>
+
+    <!-- 3秒後に自動で戻る案内 -->
+    <p style="color: #aaa; font-size: 0.9rem;">
+        3秒後に自動でプレイヤー画面へ戻ります...
+    </p>
+
+    <div style="margin-top: 20px;">
+        <a href="{% url 'player' %}" class="btn" style="display: inline-block; padding: 10px 20px; background: #444; color: #fff; text-decoration: none; border-radius: 5px;">
+            プレイヤー画面へ戻る
+        </a>
+    </div>
 </div>
+
+<script>
+    // 3秒（3000ミリ秒）後に自動的に /player/ へ遷移する
+    setTimeout(function() {
+        window.location.href = "{% url 'player' %}";
+    }, 3000);
+</script>
 {% endblock %}
