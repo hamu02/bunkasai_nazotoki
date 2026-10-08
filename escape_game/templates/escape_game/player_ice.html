@@ -1,0 +1,20 @@
+{% extends 'escape_game/base_player.html' %}
+{% load static %}
+
+{% block theme_css %}
+<link rel="stylesheet" href="{% static 'escape_game/css/ice_theme.css' %}">
+{% endblock %}
+
+{% block theme_class %}theme-ice{% endblock %}
+
+{% block element_badge %}❄️ 氷の魔法使い{% endblock %}
+
+{% block skill_content %}
+<div class="skill-title">魔法スキル【絶対零度】</div>
+<div class="skill-desc">全てを凍てつかせる氷結の能力</div>
+{% endblock %}
+
+{% block extra_js %}
+{{ block.super }}
+<script src="{% static 'escape_game/js/ice_theme.js' %}"></script>
+{% endblock %}

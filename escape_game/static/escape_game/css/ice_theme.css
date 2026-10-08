@@ -1,0 +1,166 @@
+/* --- 氷属性テーマ --- */
+
+/* 1. 背景全体：クリアで深い氷のグラデーション */
+body {
+    background: #061527 !important;
+    color: #e0f7fa !important;
+    position: relative;
+    margin: 0;
+    min-height: 100vh;
+    overflow-x: hidden;
+}
+
+#effect-canvas {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    pointer-events: none;
+    z-index: 1; /* コンテンツの背景に配置 */
+    background: radial-gradient(circle at 50% 50%, #0c2b4a 0%, #06182c 60%, #020b14 100%);
+}
+
+/* 2. メインUIコンテンツ（UIが粒子の上に浮き上がるように） */
+.game-wrapper {
+    position: relative !important;
+    z-index: 10 !important;
+    padding-top: 20px;
+    padding-bottom: 20px;
+}
+
+/* ヘッダー・カード（氷のガラス加工） */
+.main-header {
+    background: rgba(8, 28, 50, 0.7) !important;
+    border-bottom: 2px solid rgba(0, 229, 255, 0.6) !important;
+    backdrop-filter: blur(8px);
+    box-shadow: 0 4px 20px rgba(0, 229, 255, 0.2);
+}
+
+.game-title {
+    color: #e0f7fa !important;
+    text-shadow: 0 0 10px #00e5ff, 0 0 20px #00e5ff;
+}
+
+.element-badge {
+    background: linear-gradient(135deg, #00e5ff 0%, #00838f 100%) !important;
+    color: #ffffff !important;
+    box-shadow: 0 0 12px rgba(0, 229, 255, 0.6);
+}
+
+.status-card {
+    background: rgba(6, 22, 40, 0.75) !important;
+    border: 1px solid rgba(0, 229, 255, 0.5) !important;
+    backdrop-filter: blur(8px);
+    box-shadow: 0 0 15px rgba(0, 229, 255, 0.15) !important;
+}
+
+.card-label, .skill-title {
+    color: #80d8ff !important;
+    font-weight: bold;
+}
+
+.timer-display {
+    color: #00e5ff !important;
+    text-shadow: 0 0 8px rgba(0, 229, 255, 0.8);
+}
+
+.main-mystery-card {
+    background: rgba(6, 22, 40, 0.85) !important;
+    border: 2px solid rgba(0, 229, 255, 0.7) !important;
+    box-shadow: 0 0 25px rgba(0, 229, 255, 0.25) !important;
+    border-radius: 16px;
+    backdrop-filter: blur(8px);
+}
+
+.mystery-title {
+    color: #80d8ff !important;
+    border-bottom: 2px dashed rgba(0, 229, 255, 0.4);
+}
+
+.statement-box {
+    color: #e0f7fa !important;
+    background: rgba(12, 38, 65, 0.6);
+    border-left: 4px solid #00e5ff;
+    padding: 12px;
+    border-radius: 4px;
+}
+
+.input-group input {
+    background: rgba(4, 15, 28, 0.9) !important;
+    border: 2px solid #00bcd4 !important;
+    color: #ffffff !important;
+}
+
+.input-group input:focus {
+    border-color: #00e5ff !important;
+    box-shadow: 0 0 12px rgba(0, 229, 255, 0.6);
+}
+
+.cast-btn {
+    background: linear-gradient(135deg, #00e5ff 0%, #006064 100%) !important;
+    color: #ffffff !important;
+    border: none !important;
+    box-shadow: 0 0 15px rgba(0, 229, 255, 0.5);
+}
+
+.cast-btn:hover {
+    background: linear-gradient(135deg, #80d8ff 0%, #00838f 100%) !important;
+}
+
+#effect-canvas {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    pointer-events: none;
+    z-index: 1;
+    /* 明るく華やかな水色〜深い青のグラデーション */
+    background: radial-gradient(circle at 50% 40%, #1a6b9c 0%, #0c3b63 50%, #051a30 100%);
+}
+
+/* --- 画面全体の凍結オーバーレイ --- */
+#freeze-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    pointer-events: none; /* UIのクリックを邪魔しない */
+    z-index: 5; /* UIの背景と手前の間 */
+    
+    /* 初期値（0%〜100%でJSから操作） */
+    --freeze-level: 0%;
+
+    /* 四隅から凍りつく氷の結晶シェーダー風グラデーション */
+    background: 
+        /* 氷の結晶テクスチャ（ひび割れ・結晶感） */
+        radial-gradient(
+            circle at center,
+            transparent calc(100% - (var(--freeze-level) * 0.8)),
+            rgba(180, 240, 255, calc(var(--freeze-level) * 0.004)) calc(100% - (var(--freeze-level) * 0.4)),
+            rgba(0, 229, 255, calc(var(--freeze-level) * 0.008)) 100%
+        ),
+        /* 外枠からの白っぽい氷結・霜（フロスト） */
+        radial-gradient(
+            ellipse at center,
+            transparent calc(90% - var(--freeze-level)),
+            rgba(200, 245, 255, 0.4) calc(100% - (var(--freeze-level) * 0.5)),
+            rgba(100, 210, 255, 0.8) 100%
+        );
+
+    /* 氷のザラザラした光の屈折感をぼかしで表現 */
+    backdrop-filter: blur(calc(var(--freeze-level) * 0.08px));
+    transition: --freeze-level 0.5s ease-out;
+}
+
+/* 画面の周りに付く氷のトゲ・結晶線（SVGマスク風） */
+#freeze-overlay::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    box-shadow: inset 0 0 calc(var(--freeze-level) * 1.5px) rgba(220, 250, 255, 0.9),
+                inset 0 0 calc(var(--freeze-level) * 0.8px) rgba(0, 229, 255, 0.6);
+    opacity: calc(var(--freeze-level) / 100%);
+}

@@ -51,6 +51,15 @@ def player_view(request):
     template_name = 'escape_game/player_normal.html' # 通常/未設定時
     if team.element == 'time':
         template_name = 'escape_game/player_time.html' # 時間属性用
+
+    elif team.element == 'grass':
+        template_name = 'escape_game/player_grass.html'
+
+    elif team.element == 'fire':
+        template_name = 'escape_game/player_fire.html'
+
+    elif team.element == 'ice':
+            template_name = 'escape_game/player_ice.html'
     # ※今後「水」「火」などが増えたらここに追加
 
     return render(request, template_name, {

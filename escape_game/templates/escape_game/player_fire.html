@@ -1,0 +1,21 @@
+{% extends 'escape_game/base_player.html' %}
+{% load static %}
+
+{% block theme_css %}
+<link rel="stylesheet" href="{% static 'escape_game/css/fire_theme.css' %}">
+{% endblock %}
+
+{% block theme_class %}theme-fire{% endblock %}
+
+{% block element_badge %}🔥 {{ team.get_element_display }}{% endblock %}
+
+{% block skill_content %}
+<div class="skill-title">魔法スキル【火炎地獄】</div>
+<div class="skill-desc">業火の熱気が迷宮を包み込んでいる</div>
+{% endblock %}
+
+{% block extra_js %}
+<!-- 通常のプレイヤー制御JSと、火属性用のCanvas演出JSを両方読み込む -->
+<script src="{% static 'escape_game/js/player.js' %}"></script>
+<script src="{% static 'escape_game/js/fire_theme.js' %}"></script>
+{% endblock %}

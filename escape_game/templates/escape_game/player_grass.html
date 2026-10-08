@@ -1,0 +1,20 @@
+{% extends 'escape_game/base_player.html' %}
+{% load static %}
+
+{% block theme_css %}
+<link rel="stylesheet" href="{% static 'escape_game/css/grass_theme.css' %}">
+{% endblock %}
+
+{% block theme_class %}theme-grass{% endblock %}
+
+{% block element_badge %}🌿 {{ team.get_element_display }}{% endblock %}
+
+{% block skill_content %}
+<div class="skill-title">魔法スキル【大自然の息吹】</div>
+<div class="skill-desc">緑の恵みが迷宮を包み込んでいる</div>
+{% endblock %}
+
+{% block extra_js %}
+{{ block.super }}
+<script src="{% static 'escape_game/js/grass_theme.js' %}"></script>
+{% endblock %}
