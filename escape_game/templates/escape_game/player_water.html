@@ -1,0 +1,20 @@
+{% extends 'escape_game/base_player.html' %}
+{% load static %}
+
+{% block theme_css %}
+<link rel="stylesheet" href="{% static 'escape_game/css/water_theme.css' %}">
+{% endblock %}
+
+{% block theme_class %}theme-water{% endblock %}
+
+{% block element_badge %}💧 {{ team.get_element_display }}{% endblock %}
+
+{% block skill_content %}
+<div class="skill-title">魔法スキル【静謐なる癒やし】</div>
+<div class="skill-desc">すべての属性を包み込み、清らかな水へと還す</div>
+{% endblock %}
+
+{% block extra_js %}
+{{ block.super }}
+<script src="{% static 'escape_game/js/water_theme.js' %}"></script>
+{% endblock %}

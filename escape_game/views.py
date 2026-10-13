@@ -59,7 +59,9 @@ def player_view(request):
         template_name = 'escape_game/player_fire.html'
 
     elif team.element == 'ice':
-            template_name = 'escape_game/player_ice.html'
+        template_name = 'escape_game/player_ice.html'
+    elif team.element == 'water':
+        template_name = 'escape_game/player_water.html'
     # ※今後「水」「火」などが増えたらここに追加
 
     return render(request, template_name, {

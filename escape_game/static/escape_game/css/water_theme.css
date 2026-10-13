@@ -1,0 +1,103 @@
+/* --- 水属性テーマ（深海・透明感・癒やし） --- */
+
+body {
+    background: linear-gradient(180deg, #01579b 0%, #00838f 50%, #00695c 100%) !important;
+    color: #e0f7fa !important;
+}
+
+#effect-canvas {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    pointer-events: none;
+    z-index: -1;
+    background: linear-gradient(to bottom, #0277bd 0%, #00acc1 50%, #00838f 100%);
+}
+
+.game-wrapper {
+    position: relative;
+    z-index: 1;
+}
+
+/* ヘッダー＆バッジ */
+.main-header {
+    border-bottom: 2px solid rgba(128, 222, 234, 0.3);
+    background: rgba(0, 77, 64, 0.45) !important;
+    backdrop-filter: blur(8px);
+}
+
+.game-title {
+    color: #e0f7fa !important;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
+}
+
+.element-badge {
+    background: #00acc1 !important;
+    color: #ffffff !important;
+    box-shadow: 0 2px 10px rgba(0, 172, 193, 0.5);
+}
+
+/* ステータスカート */
+.status-card {
+    background: rgba(0, 96, 100, 0.55) !important;
+    border: 1px solid rgba(128, 222, 234, 0.4) !important;
+    backdrop-filter: blur(8px);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
+}
+
+.card-label, .skill-title {
+    color: #80deea !important;
+    font-weight: bold;
+}
+
+.timer-display {
+    color: #e0f7fa !important;
+    text-shadow: 0 0 10px rgba(128, 222, 234, 0.6);
+}
+
+/* メインカード（ガラス調） */
+.main-mystery-card {
+    background: rgba(0, 77, 64, 0.65) !important;
+    border: 2px solid rgba(128, 222, 234, 0.6) !important;
+    box-shadow: 0 15px 35px rgba(0, 0, 0, 0.3), inset 0 0 20px rgba(0, 229, 255, 0.15);
+    backdrop-filter: blur(10px);
+    border-radius: 16px;
+}
+
+.mystery-title {
+    color: #80deea !important;
+    border-bottom: 2px dashed rgba(128, 222, 234, 0.4);
+}
+
+.statement-box {
+    color: #e0f7fa !important;
+    background: rgba(0, 51, 51, 0.4);
+    border-left: 4px solid #00e5ff;
+    padding: 12px;
+    border-radius: 4px;
+}
+
+/* 入力フォーム＆ボタン */
+.input-group input {
+    background: rgba(0, 51, 51, 0.6) !important;
+    border: 2px solid rgba(128, 222, 234, 0.5) !important;
+    color: #ffffff !important;
+}
+
+.input-group input:focus {
+    border-color: #00e5ff !important;
+    box-shadow: 0 0 10px rgba(0, 229, 255, 0.5);
+}
+
+.cast-btn {
+    background: linear-gradient(135deg, #00acc1 0%, #00838f 100%) !important;
+    color: #ffffff !important;
+    border: none !important;
+    box-shadow: 0 4px 15px rgba(0, 172, 193, 0.4);
+}
+
+.cast-btn:hover {
+    background: linear-gradient(135deg, #00e5ff 0%, #00acc1 100%) !important;
+}
