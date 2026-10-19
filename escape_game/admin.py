@@ -10,3 +10,5 @@ class TeamAdmin(admin.ModelAdmin):
 @admin.register(Mystery)
 class MysteryAdmin(admin.ModelAdmin):
     list_display = ('stage_number', 'title', 'answer')
+
+    fields = ('title', 'statement', 'image', 'answer', 'hint_ice', 'hint_grass', 'hint_fire')

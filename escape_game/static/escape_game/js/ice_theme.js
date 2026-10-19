@@ -16,7 +16,9 @@ document.addEventListener('DOMContentLoaded', () => {
     let targetTimestamp = null;
     let isPaused = false;
     let remainingSecondsWhenPaused = 0;
-    const TOTAL_LIMIT = 1800; // 30分 (1800秒)
+    
+    // 🌟 変更：基本制限時間を 10分（600秒）にし、延長も考慮できるようにする
+    let totalLimit = 600;
 
     // ==========================================
     // 1. 上から下に降る「粉雪」
@@ -179,14 +181,6 @@ document.addEventListener('DOMContentLoaded', () => {
     function render() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-        // 時間計算（タイマー連動）
-        let currentRemaining = TOTAL_LIMIT;
-        if (isPaused) {
-            currentRemaining = remainingSecondsWhenPaused;
-        } else if (targetTimestamp) {
-            currentRemaining = Math.max(0, Math.floor((targetTimestamp - Date.now()) / 1000));
-        }
-
         // 粉雪の更新・描画
         fallingSnow.forEach(s => {
             s.update();
@@ -233,14 +227,21 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function updateFreezeProgress() {
-        let currentRemaining = TOTAL_LIMIT;
+        let currentRemaining = totalLimit;
         if (isPaused) {
             currentRemaining = remainingSecondsWhenPaused;
         } else if (targetTimestamp) {
             currentRemaining = Math.max(0, Math.floor((targetTimestamp - Date.now()) / 1000));
         }
 
-        const elapsedRatio = Math.max(0, Math.min(1, (TOTAL_LIMIT - currentRemaining) / TOTAL_LIMIT));
+        // 🌟 延長された場合（スキル使用など）に上限を動的に広げる
+        if (currentRemaining > totalLimit) {
+            totalLimit = currentRemaining;
+        }
+
+        // 経過した割合（0% → 時間が経つにつれて 100% に近づき、画面が凍てつく）
+        const elapsedSeconds = totalLimit - currentRemaining;
+        const elapsedRatio = Math.max(0, Math.min(1, elapsedSeconds / totalLimit));
         const freezePercent = elapsedRatio * 100;
 
         freezeOverlay.style.setProperty('--freeze-level', `${freezePercent}%`);

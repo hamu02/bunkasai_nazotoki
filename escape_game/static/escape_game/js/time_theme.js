@@ -16,7 +16,9 @@ document.addEventListener('DOMContentLoaded', () => {
     let targetTimestamp = null;
     let isPaused = false;
     let remainingSecondsWhenPaused = 0;
-    const TOTAL_LIMIT = 1800; // 30分 (1800秒)
+    
+    // 🌟 変更①：基本制限時間を 10分（600秒）に設定。延長された場合はここを自動的に広げる
+    let totalLimit = 600; 
 
     // 1. 光の粉塵（少し落ち着いた密度に）
     const particles = Array.from({ length: 50 }, () => ({
@@ -30,13 +32,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // 2. 精密メカ歯車群（画面全体に適度な余白をもって配置：10個）
     const bgGears = [
-        // 上部・左右
         { x: 0.12, y: 0.22, radius: 140, teeth: 22, speed: 0.0007, color: 'rgba(212, 175, 55, 0.28)', rot: 0.4 },
         { x: 0.62, y: 0.15, radius: 160, teeth: 26, speed: -0.0005, color: 'rgba(0, 255, 204, 0.28)', rot: 1.2 },
-        // 中央周辺（薄め）
         { x: 0.88, y: 0.42, radius: 130, teeth: 18, speed: -0.0008, color: 'rgba(212, 175, 55, 0.28)', rot: 0.5 },
         { x: 0.08, y: 0.62, radius: 150, teeth: 22, speed: 0.0006, color: 'rgba(255, 77, 77, 0.25)', rot: 1.5 },
-        // 下部（間引きしてスッキリ）
         { x: 0.32, y: 0.85, radius: 140, teeth: 20, speed: -0.0009, color: 'rgba(255, 204, 0, 0.3)', rot: -0.8 },
         { x: 0.58, y: 0.90, radius: 190, teeth: 28, speed: -0.0004, color: 'rgba(255, 170, 0, 0.32)', rot: 0.9 },
         { x: 0.82, y: 0.82, radius: 130, teeth: 18, speed: 0.0008, color: 'rgba(0, 255, 204, 0.28)', rot: -1.2 },
@@ -45,7 +44,7 @@ document.addEventListener('DOMContentLoaded', () => {
         { x: 0.72, y: 0.68, radius: 110, teeth: 16, speed: -0.0007, color: 'rgba(255, 170, 0, 0.25)', rot: 0.7 }
     ];
 
-    // 3. 散らばる時計盤（重なりを減らし視覚的疲労を軽減：5個）
+    // 3. 散らばる時計盤（5個）
     const clocks = [
         { x: 0.25, y: 0.25, radius: 220, color: '#ffcc00', glow: 'rgba(255, 204, 0, 0.4)', alpha: 0.6 },
         { x: 0.78, y: 0.20, radius: 200, color: '#00ffcc', glow: 'rgba(0, 255, 204, 0.4)', alpha: 0.65 },
@@ -54,7 +53,7 @@ document.addEventListener('DOMContentLoaded', () => {
         { x: 0.88, y: 0.85, radius: 260, color: '#e69900', glow: 'rgba(230, 153, 0, 0.4)', alpha: 0.5 }
     ];
 
-    // 4. タイマー連動砂時計（倒れたり傾いたデザインを厳選して配置：8個）
+    // 4. タイマー連動砂時計（8個）
     const hourglasses = [
         { x: 0.54, y: 0.22, scale: 0.65, alpha: 0.30, color: '#00ffcc', rot: -0.8 },
         { x: 0.08, y: 0.25, scale: 0.70, alpha: 0.32, color: '#ffaa00', rot: 0.25 },
@@ -220,22 +219,28 @@ document.addEventListener('DOMContentLoaded', () => {
         ctx.closePath();
         ctx.stroke();
 
-        // 砂の量連動
+        // 🌟 修正：上側の砂（残り時間に応じて減っていく）
+        // remainingRatio が 1.0（満タン）のときは上側が一杯、0.0のときは空になる
         if (remainingRatio > 0) {
-            const topHeight = (h / 2 - 7) * remainingRatio;
+            const maxSandHeight = h / 2 - 7;
+            const topHeight = maxSandHeight * remainingRatio;
             const topWidth = (w / 2 - 4) * remainingRatio;
+            
             ctx.beginPath();
-            ctx.moveTo(-topWidth, -h / 2 + 4 + (h / 2 - 7 - topHeight));
-            ctx.lineTo(topWidth, -h / 2 + 4 + (h / 2 - 7 - topHeight));
+            ctx.moveTo(-topWidth, -h / 2 + 4 + (maxSandHeight - topHeight));
+            ctx.lineTo(topWidth, -h / 2 + 4 + (maxSandHeight - topHeight));
             ctx.lineTo(0, 0);
             ctx.closePath();
             ctx.fill();
         }
 
+        // 🌟 修正：下側の砂（経過時間に応じて下から溜まっていく）
         const bottomRatio = 1 - remainingRatio;
         if (bottomRatio > 0) {
-            const bottomHeight = (h / 2 - 7) * bottomRatio;
+            const maxSandHeight = h / 2 - 7;
+            const bottomHeight = maxSandHeight * bottomRatio;
             const bottomWidth = (w / 2 - 4) * bottomRatio;
+            
             ctx.beginPath();
             ctx.moveTo(-bottomWidth, h / 2 - 4);
             ctx.lineTo(bottomWidth, h / 2 - 4);
@@ -244,6 +249,7 @@ document.addEventListener('DOMContentLoaded', () => {
             ctx.fill();
         }
 
+        // 落ちる砂の筋
         if (remainingRatio > 0 && remainingRatio < 1 && !isPaused) {
             ctx.lineWidth = 1.2;
             ctx.beginPath();
@@ -261,13 +267,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const now = new Date();
 
-        let currentRemaining = TOTAL_LIMIT;
+        let currentRemaining = totalLimit;
         if (isPaused) {
             currentRemaining = remainingSecondsWhenPaused;
         } else if (targetTimestamp) {
             currentRemaining = Math.max(0, Math.floor((targetTimestamp - Date.now()) / 1000));
         }
-        const remainingRatio = Math.max(0, Math.min(1, currentRemaining / TOTAL_LIMIT));
+
+        // 🌟 修正②：現在の残り時間が初期の総制限時間（600秒）を超えている場合（時間延長スキル使用時）、
+        // 動的に総制限時間の基準を上げて砂時計がパンクしないように連動させる
+        if (currentRemaining > totalLimit) {
+            totalLimit = currentRemaining;
+        }
+
+        const remainingRatio = Math.max(0, Math.min(1, currentRemaining / totalLimit));
 
         particles.forEach(p => {
             ctx.fillStyle = `rgba(255, 230, 150, ${p.alpha})`;
