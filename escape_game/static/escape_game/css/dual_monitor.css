@@ -1,0 +1,129 @@
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    background-color: #050811;
+    color: #e0e6ed;
+    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    width: 100vw;
+    height: 100vh;
+    overflow: hidden;
+}
+
+.dual-monitor-wrapper {
+    width: 100vw;
+    height: 100vh;
+    padding: 15px 30px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+
+.monitor-main-title {
+    font-size: 2.2vw;
+    text-align: center;
+    color: #00f3ff;
+    text-shadow: 0 0 15px rgba(0, 243, 255, 0.6);
+    letter-spacing: 2px;
+    margin-bottom: 10px;
+}
+
+.monitors-container {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    height: calc(100vh - 70px);
+}
+
+.monitor-slot {
+    flex: 1;
+    background: rgba(10, 16, 30, 0.9);
+    border: 2px solid #00f3ff;
+    border-radius: 16px;
+    padding: 20px 30px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 0 20px rgba(0, 243, 255, 0.2);
+    transition: all 0.5s ease;
+}
+
+.monitor-slot.empty {
+    border: 2px dashed rgba(148, 163, 184, 0.4);
+    background: rgba(15, 23, 42, 0.4);
+    justify-content: center;
+    align-items: center;
+    box-shadow: none;
+}
+
+.waiting-message {
+    font-size: 1.5rem;
+    color: #64748b;
+    letter-spacing: 2px;
+}
+
+/* スロット内部の情報配置 */
+.slot-left {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.team-name-label {
+    font-size: 1.2rem;
+    color: #94a3b8;
+    margin-bottom: 5px;
+}
+
+.team-name-value {
+    font-size: 3.5vw;
+    font-weight: 800;
+    color: #ffffff;
+    text-shadow: 0 0 10px #00f3ff;
+}
+
+.stage-badge {
+    font-size: 1.5rem;
+    background: rgba(0, 243, 255, 0.1);
+    border: 1px solid #00f3ff;
+    padding: 6px 16px;
+    border-radius: 8px;
+    color: #00f3ff;
+    font-weight: bold;
+    margin-top: 8px;
+    display: inline-block;
+    width: fit-content;
+}
+
+.slot-right {
+    text-align: right;
+}
+
+.timer-label {
+    font-size: 1.1rem;
+    color: #94a3b8;
+    letter-spacing: 2px;
+}
+
+.slot-timer {
+    font-size: 7vw;
+    font-weight: 900;
+    color: #00f3ff;
+    text-shadow: 0 0 25px rgba(0, 243, 255, 0.7);
+    line-height: 1;
+}
+
+/* 警告・クリア状態 */
+.timer-warning {
+    color: #ff3366 !important;
+    text-shadow: 0 0 30px rgba(255, 51, 102, 0.9) !important;
+}
+
+.slot-slot-cleared {
+    border-color: #38ef7d !important;
+    box-shadow: 0 0 30px rgba(56, 239, 125, 0.4) !important;
+}

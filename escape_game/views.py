@@ -5,20 +5,34 @@ from django.http import JsonResponse
 from django.utils import timezone
 from .models import Team, Mystery
 
-# 1. ログイン（合言葉でスタート）
 def login_view(request):
     if request.method == 'POST':
         passcode = request.POST.get('passcode', '').strip()
         if passcode:
             team, created = Team.objects.get_or_create(name=passcode)
-            
-            # 初回ログイン時にスタート時刻と「ランダム3問の割り当て」を行う
+
+            if not created:
+                team.visitor_count += 1
+                team.save()
+
+            # 初回ログイン時に問題セットを割り振る
             if not team.start_time:
                 team.start_time = timezone.now()
                 
-                # 全問題のIDを取得してランダムに3問選ぶ
-                all_ids = list(Mystery.objects.values_list('id', flat=True))
-                selected_ids = random.sample(all_ids, min(3, len(all_ids)))
+                # 🌟 チームの総数などで1組目（stage 1〜3）か2組目（stage 4〜6）のセットを決定
+                total_teams_count = Team.objects.count()
+                
+                if total_teams_count % 2 == 0:
+                    # 1組目のセット（stage_number 1, 2, 3 の問題）
+                    selected_ids = list(Mystery.objects.filter(stage_number__in=[1, 2, 3]).order_by('stage_number').values_list('id', flat=True))
+                else:
+                    # 2組目のセット（stage_number 4, 5, 6 の問題）
+                    selected_ids = list(Mystery.objects.filter(stage_number__in=[4, 5, 6]).order_by('stage_number').values_list('id', flat=True))
+                
+                # 万が一データが取れない場合の安全策（DB全体の最初の3問）
+                if not selected_ids:
+                    selected_ids = list(Mystery.objects.all().order_by('id').values_list('id', flat=True)[:3])
+
                 team.assigned_mystery_ids = json.dumps(selected_ids)
                 team.save()
                 
@@ -27,7 +41,7 @@ def login_view(request):
             
     return render(request, 'escape_game/login.html')
 
-# 2. プレイヤー画面
+# プレイヤー画面：スマホごとに設定された属性のテンプレートを表示する
 def player_view(request):
     team_name = request.session.get('team_name')
     if not team_name:
@@ -35,11 +49,9 @@ def player_view(request):
         
     team = get_object_or_404(Team, name=team_name)
     
-    # タイムアップ判定
     if team.remaining_seconds <= 0:
         return render(request, 'escape_game/game_over.html', {'team': team})
 
-    # 🌟 ここで先に assigned_mysteries を定義する！
     assigned_mysteries = team.get_assigned_mysteries()
 
     if team.current_stage > len(assigned_mysteries) and len(assigned_mysteries) > 0:
@@ -59,16 +71,19 @@ def player_view(request):
         else:
             error_message = "答えが違うようだ..."
 
+    # 🌟 このスマホ（セッション）が担当している属性を取得する（初期値はnormal）
+    player_element = request.session.get('player_element', 'normal')
+
     template_name = 'escape_game/player_normal.html'
-    if team.element == 'time':
+    if player_element == 'time':
         template_name = 'escape_game/player_time.html'
-    elif team.element == 'grass':
+    elif player_element == 'grass':
         template_name = 'escape_game/player_grass.html'
-    elif team.element == 'fire':
+    elif player_element == 'fire':
         template_name = 'escape_game/player_fire.html'
-    elif team.element == 'ice':
+    elif player_element == 'ice':
         template_name = 'escape_game/player_ice.html'
-    elif team.element == 'water':
+    elif player_element == 'water':
         template_name = 'escape_game/player_water.html'
 
     return render(request, template_name, {
@@ -77,7 +92,6 @@ def player_view(request):
         'error_message': error_message,
         'total_stages': len(assigned_mysteries),
     })
-
 
 def get_team_state(request, team_name):
     team = get_object_or_404(Team, name=team_name)
@@ -116,15 +130,47 @@ def monitor_view(request, team_name):
     team = get_object_or_404(Team, name=team_name)
     return render(request, 'escape_game/monitor.html', {'team': team})
 
+# 🌟 ① 今アクティブな最大2つのチームのデータを返すAPI
+def active_teams_api(request):
+    # まだクリアしていなくてゲームオーバーにもなっていない、または直近で動いているチームを最大2つ取得
+    # （※ テスト用に直近でアクセスがあった順や、スタートしているチームを抽出）
+    active_teams = Team.objects.filter(start_time__isnull=False).order_by('-last_accessed')[:2]
+    
+    teams_data = []
+    for team in active_teams:
+        assigned_mysteries = team.get_assigned_mysteries()
+        total_mysteries = len(assigned_mysteries)
+        remaining = team.remaining_seconds
+        
+        is_cleared = (team.current_stage > total_mysteries) if total_mysteries > 0 else False
+        is_game_over = remaining <= 0
+        
+        # すでにクリアかゲームオーバーになってから時間が経っているものは除外したい場合はここで弾けますが、
+        # まずはシンプルに直近の2チームを返します
+        
+        teams_data.append({
+            'name': team.name,
+            'stage': team.current_stage,
+            'time_remaining': remaining,
+            'is_paused': team.is_paused,
+            'is_cleared': is_cleared,
+            'is_game_over': is_game_over,
+        })
+        
+    return JsonResponse({'teams': teams_data})
+
+# 🌟 ② 2分割モニター用のHTMLを表示するビュー
+def dual_monitor_view(request):
+    return render(request, 'escape_game/dual_monitor.html')
+
+# NFCタグを読み取った時：そのスマホ（セッション）の担当属性をセットする
 def register_element_nfc(request, element):
     team_name = request.session.get('team_name')
     if not team_name:
         return redirect('login')
         
-    team = get_object_or_404(Team, name=team_name)
-    team.element = element
-    team.last_event = f"REGISTER_{element.upper()}"
-    team.save()
+    # チームモデル全体ではなく、このスマホのセッションに属性を保存する
+    request.session['player_element'] = element
     return redirect('player')
 
 def trigger_skill_nfc(request, element):
@@ -197,3 +243,25 @@ def game_clear_view(request):
     team_name = request.session.get('team_name')
     team = get_object_or_404(Team, name=team_name) if team_name else None
     return render(request, 'escape_game/game_clear.html', {'team': team})
+
+def admin_teams_status_api(request):
+    teams = Team.objects.all()
+    data = []
+    for team in teams:
+        secs = team.remaining_seconds
+        mins = secs // 60
+        s = secs % 60
+        
+        t = "⏱️" if team.skill_time_used else "・"
+        i = "❄️" if team.skill_ice_used else "・"
+        g = "🌿" if team.skill_grass_used else "・"
+        f = "🔥" if team.skill_fire_used else "・"
+        skill_summary = f"時:{t} 氷:{i} 草:{g} 炎:{f}"
+        
+        data.append({
+            'name': team.name,
+            'stage': team.current_stage,
+            'remaining_formatted': f"{mins}分 {s:02d}秒",
+            'skill_summary': skill_summary,
+        })
+    return JsonResponse({'teams': data})

@@ -1,3 +1,4 @@
+import json
 from django.db import models
 from django.utils import timezone
 
@@ -15,6 +16,9 @@ class Team(models.Model):
     current_stage = models.IntegerField(default=1)
 
     assigned_mystery_ids = models.TextField(default='[]', blank=True)
+
+    visitor_count = models.IntegerField(default=1) # 同じ合言葉で何回アクセスされたか（来場者・端末数カウント用）
+    last_accessed = models.DateTimeField(auto_now=True) # 最後に動いた時刻（アクティブ判定用）
     
     # 時間管理用（10分 ＝ 600秒）
     time_limit_seconds = models.IntegerField(default=600)

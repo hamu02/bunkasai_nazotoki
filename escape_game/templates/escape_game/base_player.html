@@ -47,43 +47,43 @@
         </div>
     </div>
 
-    <!-- 3. メイン謎エリア（羊皮紙） -->
-    {% if mystery %}
-        <main class="main-mystery-card">
-            <div class="stage-info">
-                <span class="checkpoint-text">チェックポイント {{ team.current_stage }} / 4</span>
-                <h2 class="mystery-title">第{{ team.current_stage }}章: {{ mystery.title }}</h2>
-            </div>
-
-            <div class="statement-box">
+    <!-- 🌟 3. 謎解き出題エリア（ここに必ず配置！） -->
+    <div class="mystery-container" style="background: rgba(15, 23, 42, 0.85); border: 2px solid #00f3ff; border-radius: 16px; padding: 25px; margin: 20px 0; color: #fff;">
+        
+        {% if mystery %}
+            <!-- ステージ数 ＆ 問題タイトル -->
+            <div style="font-size: 0.9rem; color: #00f3ff; margin-bottom: 5px;">STAGE {{ team.current_stage }} / {{ total_stages }}</div>
+            <h2 style="font-size: 1.5rem; margin-bottom: 15px; border-bottom: 1px solid rgba(0,243,255,0.3); padding-bottom: 8px;">
+                {{ mystery.title }}
+            </h2>
+            
+            <!-- 問題文（HTMLタグ対応） -->
+            <div class="mystery-statement" style="font-size: 1.1rem; line-height: 1.6; margin-bottom: 20px;">
                 {{ mystery.statement|safe }}
             </div>
-
-            {% if mystery.image %}
-                <div class="parchment-area">
-                    <div class="parchment-content">
-                        <img src="{{ mystery.image.url }}" alt="挿絵">
-                    </div>
-                </div>
-            {% endif %}
-
-            {% if error_message %}
-                <div class="error-message">
-                    {{ error_message }}
-                </div>
-            {% endif %}
-
-            <!-- 謎の回答フォーム -->
-            <form method="POST" class="answer-form">
+            
+            <!-- 解答入力フォーム -->
+            <form method="POST" style="display: flex; gap: 10px; margin-top: 15px;">
                 {% csrf_token %}
-                <label for="ans-input" class="input-label">呪文（答え）を入力</label>
-                <div class="input-group">
-                    <input type="text" id="ans-input" name="answer" placeholder="答えを入力..." required autocomplete="off">
-                    <button type="submit" class="cast-btn">詠唱 ⚡</button>
-                </div>
+                <input type="text" name="answer" placeholder="答えを入力..." required 
+                       style="flex: 1; padding: 12px 15px; font-size: 1rem; background: #050811; border: 2px solid #00f3ff; border-radius: 8px; color: #fff; outline: none;">
+                <button type="submit" 
+                        style="padding: 12px 24px; font-size: 1rem; font-weight: bold; background: #00f3ff; color: #050811; border: none; border-radius: 8px; cursor: pointer; transition: 0.2s;">
+                    解答する
+                </button>
             </form>
-        </main>
-    {% endif %}
+            
+            <!-- 間違えたときのエラーメッセージ -->
+            {% if error_message %}
+                <p style="color: #ff3366; margin-top: 10px; font-weight: bold;">{{ error_message }}</p>
+            {% endif %}
+            
+        {% else %}
+            <p>現在出題できる問題がありません。</p>
+        {% endif %}
+
+    </div>
+
 </div>
 
 {% block extra_js %}

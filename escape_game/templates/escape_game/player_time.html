@@ -3,6 +3,31 @@
 
 {% block theme_class %}theme-time{% endblock %}
 
+{% block theme_css %}
+<style>
+  /* スマホ画面（幅480px以下）のときだけヘッダーの崩れを防止するスタイル */
+  @media screen and (max-width: 480px) {
+    .main-header {
+      flex-wrap: wrap; /* 画面が狭くなったら要素を折り返す */
+      gap: 6px;
+      padding: 10px;
+    }
+    .header-right {
+      width: 100%;
+      justify-content: flex-end;
+      gap: 6px;
+    }
+    .game-title {
+      font-size: 1.1rem; /* タイトルを少しだけコンパクトにして収まりを良くする */
+    }
+    .element-badge {
+      font-size: 0.8rem; /* 「時間の魔法使い」の文字サイズを調整 */
+      padding: 3px 6px;
+    }
+  }
+</style>
+{% endblock %}
+
 {% block element_badge %}⏳ 時間の魔法使い{% endblock %}
 
 {% block skill_content %}

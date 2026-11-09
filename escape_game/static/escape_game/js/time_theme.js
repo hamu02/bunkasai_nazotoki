@@ -3,9 +3,17 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
 
+    let bgScale = 1;
+
     function resize() {
         canvas.width = window.innerWidth;
         canvas.height = window.innerHeight;
+
+        // 画面幅に応じて背景を縮小
+        bgScale = Math.min(
+            1,
+            Math.max(0.48, canvas.width / 1000)
+        );
     }
     resize();
     window.addEventListener('resize', resize);
@@ -75,6 +83,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         ctx.save();
         ctx.translate(cx, cy);
+        ctx.scale(bgScale, bgScale);
         ctx.rotate(g.angle);
 
         ctx.strokeStyle = g.color;
@@ -131,6 +140,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         ctx.save();
         ctx.translate(cx, cy);
+        ctx.scale(bgScale, bgScale);
         ctx.globalAlpha = c.alpha;
 
         ctx.shadowColor = c.glow;
@@ -197,6 +207,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         ctx.save();
         ctx.translate(cx, cy);
+        ctx.scale(bgScale, bgScale);
         ctx.rotate(hg.rot);
         ctx.globalAlpha = hg.alpha;
 
