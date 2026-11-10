@@ -16,4 +16,6 @@ urlpatterns = [
     path('nfc/skill/<str:element>/', views.trigger_skill_nfc, name='skill_nfc'),
 
     path('api/admin_teams_status/', views.admin_teams_status_api, name='admin_teams_status_api'),
+    path('correct/', views.correct_view, name='correct'),
+    path('water/select/', views.water_select_view, name='water_select'),
 ]

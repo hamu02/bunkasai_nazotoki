@@ -8,6 +8,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let isPaused = false;
     let remainingSecondsWhenPaused = 0;
     let isRedirecting = false;
+    const initialStage = Number(wrapper?.dataset.stage || 0);
+    const initialHints = wrapper?.dataset.hints || '';
 
     // タイマー描画機能
     function renderTimer() {
@@ -39,6 +41,23 @@ document.addEventListener('DOMContentLoaded', () => {
             const response = await fetch(`/api/state/${encodeURIComponent(teamName)}/`);
             if (response.ok) {
                 const data = await response.json();
+
+                if (!isRedirecting) {
+                    const serverStage = Number(data.stage);
+                    const serverHints =
+                        data.active_hint_stage === serverStage
+                            ? (data.active_hint_elements || []).join(',')
+                            : '';
+
+                    if (
+                        serverStage !== initialStage ||
+                        serverHints !== initialHints
+                    ) {
+                        isRedirecting = true;
+                        window.location.reload();
+                        return;
+                    }
+                }
 
                 isPaused = data.is_paused;
                 remainingSecondsWhenPaused = data.time_remaining;

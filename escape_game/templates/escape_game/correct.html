@@ -1,0 +1,110 @@
+
+{% extends 'escape_game/base.html' %}
+
+{% block content %}
+
+
+
+<style>
+    .correct-page {
+        min-height: 100dvh;
+        width: 100%;
+        box-sizing: border-box;
+
+        display: flex;
+        align-items: center;
+        justify-content: center;
+
+        padding: 24px 16px;
+
+        background:
+            radial-gradient(ellipse at center, #493321 0%, #21170f 75%, #120d09 100%);
+    }
+
+    .correct-card {
+        width: 100%;
+        max-width: 520px;
+        box-sizing: border-box;
+
+        padding: 40px 32px;
+        text-align: center;
+
+        background: linear-gradient(145deg, #302216, #1e1711);
+        border: 2px solid #b9914e;
+        border-radius: 18px;
+        color: #f4e7c8;
+
+        box-shadow: 0 10px 35px rgba(0,0,0,0.4);
+    }
+    
+    /* 次の問題へ進むボタン */
+    .correct-card .correct-button {
+        display: block;
+        width: 100%;
+        min-height: 52px;
+        padding: 15px 20px;
+        box-sizing: border-box;
+
+        background: linear-gradient(135deg, #e5c77e, #a87935);
+        color: #2b1c10;
+        border: 1px solid #e5c77e;
+        border-radius: 10px;
+
+        font-size: 1rem;
+        font-weight: bold;
+        cursor: pointer;
+        appearance: none;
+        -webkit-appearance: none;
+    }
+
+    .correct-card .correct-button:hover {
+        filter: brightness(1.1);
+    }
+
+    @media (max-width: 600px) {
+        .correct-page {
+            min-height: 100dvh;
+            padding: 20px 12px;
+        }
+
+        .correct-card {
+            padding: 32px 20px;
+            border-radius: 14px;
+        }
+    }
+</style>
+
+
+
+<div class="correct-page">
+    <div class="correct-card">
+
+        <div class="correct-icon">✦</div>
+
+        <div class="correct-stage">
+            STAGE {{ stage }} CLEAR
+        </div>
+
+        <h1 class="correct-title">
+            謎の解読に成功！
+        </h1>
+
+        <div class="correct-subtitle">
+            {{ title }}
+        </div>
+
+        <div class="correct-message">
+            {{ message }}
+        </div>
+
+        <form method="POST">
+            {% csrf_token %}
+            <button type="submit" class="correct-button">
+                次の問題へ進む →
+            </button>
+        </form>
+
+    </div>
+</div>
+
+{% endblock %}

@@ -8,7 +8,10 @@
 
 {% block content %}
 <canvas id="effect-canvas"></canvas>
-<div class="game-wrapper {% block theme_class %}theme-normal{% endblock %}" data-team-name="{{ team.name }}">
+<div class="game-wrapper {% block theme_class %}theme-normal{% endblock %}"
+     data-team-name="{{ team.name }}"
+     data-stage="{{ team.current_stage }}"
+     data-hints="{% if team.active_hint_stage == team.current_stage %}{{ team.active_hint_elements|join:',' }}{% endif %}">
 
     <!-- 1. 最上部ヘッダー -->
     <header class="main-header">
@@ -47,42 +50,145 @@
         </div>
     </div>
 
-    <!-- 🌟 3. 謎解き出題エリア（ここに必ず配置！） -->
-    <div class="mystery-container" style="background: rgba(15, 23, 42, 0.85); border: 2px solid #00f3ff; border-radius: 16px; padding: 25px; margin: 20px 0; color: #fff;">
-        
-        {% if mystery %}
-            <!-- ステージ数 ＆ 問題タイトル -->
-            <div style="font-size: 0.9rem; color: #00f3ff; margin-bottom: 5px;">STAGE {{ team.current_stage }} / {{ total_stages }}</div>
-            <h2 style="font-size: 1.5rem; margin-bottom: 15px; border-bottom: 1px solid rgba(0,243,255,0.3); padding-bottom: 8px;">
-                {{ mystery.title }}
-            </h2>
-            
-            <!-- 問題文（HTMLタグ対応） -->
-            <div class="mystery-statement" style="font-size: 1.1rem; line-height: 1.6; margin-bottom: 20px;">
-                {{ mystery.statement|safe }}
-            </div>
-            
-            <!-- 解答入力フォーム -->
-            <form method="POST" style="display: flex; gap: 10px; margin-top: 15px;">
-                {% csrf_token %}
-                <input type="text" name="answer" placeholder="答えを入力..." required 
-                       style="flex: 1; padding: 12px 15px; font-size: 1rem; background: #050811; border: 2px solid #00f3ff; border-radius: 8px; color: #fff; outline: none;">
-                <button type="submit" 
-                        style="padding: 12px 24px; font-size: 1rem; font-weight: bold; background: #00f3ff; color: #050811; border: none; border-radius: 8px; cursor: pointer; transition: 0.2s;">
-                    解答する
-                </button>
-            </form>
-            
-            <!-- 間違えたときのエラーメッセージ -->
-            {% if error_message %}
-                <p style="color: #ff3366; margin-top: 10px; font-weight: bold;">{{ error_message }}</p>
-            {% endif %}
-            
-        {% else %}
-            <p>現在出題できる問題がありません。</p>
+
+<!-- 魔法で解放されたヒント -->
+{% if active_hints %}
+<div id="active-hints" style="margin: 18px 0;">
+
+    {% for hint in active_hints %}
+    <div style="
+        background: linear-gradient(135deg, #26313d, #17212b);
+        border: 2px solid #8bbad4;
+        border-radius: 14px;
+        padding: 20px;
+        margin-bottom: 12px;
+        color: #f4e7c8;
+        box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+    ">
+        <h3 style="
+            color: #bde7ff;
+            margin: 0 0 12px;
+            font-size: 1.1rem;
+        ">
+            {{ hint.title }}
+        </h3>
+
+        <div style="
+            font-size: 1rem;
+            line-height: 1.8;
+            white-space: pre-wrap;
+            overflow-wrap: anywhere;
+        ">{{ hint.content }}</div>
+    </div>
+    {% endfor %}
+
+</div>
+{% endif %}
+
+
+<!-- 3. 謎解き出題エリア -->
+<div class="mystery-container"
+     style="
+        background: linear-gradient(145deg, #302216, #1e1711);
+        border: 2px solid #b9914e;
+        border-radius: 16px;
+        padding: 25px;
+        margin: 20px 0;
+        color: #f4e7c8;
+        box-shadow: 0 5px 18px rgba(0,0,0,0.35);
+     ">
+
+    {% if mystery %}
+
+        <!-- ステージ数 -->
+        <div style="
+            font-size: 0.9rem;
+            color: #d6ad62;
+            margin-bottom: 8px;
+            letter-spacing: 2px;
+            font-weight: bold;
+        ">
+            STAGE {{ team.current_stage }} / {{ total_stages }}
+        </div>
+
+        <!-- 問題タイトル -->
+        <h2 style="
+            font-size: 1.5rem;
+            margin-bottom: 18px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid rgba(214,173,98,0.5);
+            color: #f1d18b;
+        ">
+            {{ mystery.title }}
+        </h2>
+
+        <!-- 問題文 -->
+        <div class="mystery-statement"
+             style="
+                font-size: 1.1rem;
+                line-height: 1.8;
+                margin-bottom: 24px;
+                color: #f4e7c8;
+             ">
+            {{ mystery.statement|safe }}
+        </div>
+
+        <!-- 解答入力フォーム -->
+        <form method="POST"
+              style="
+                display: flex;
+                gap: 10px;
+                margin-top: 15px;
+              ">
+            {% csrf_token %}
+
+            <input type="text"
+                   name="answer"
+                   placeholder="答えを入力..."
+                   required
+                   style="
+                     flex: 1;
+                     min-width: 0;
+                     padding: 12px 15px;
+                     font-size: 1rem;
+                     background: #f3e5c5;
+                     border: 2px solid #b9914e;
+                     border-radius: 8px;
+                     color: #392719;
+                     outline: none;
+                   ">
+
+            <button type="submit"
+                    style="
+                      padding: 12px 24px;
+                      font-size: 1rem;
+                      font-weight: bold;
+                      background: linear-gradient(135deg, #d9b66e, #a87935);
+                      color: #2b1c10;
+                      border: 1px solid #e5c77e;
+                      border-radius: 8px;
+                      cursor: pointer;
+                    ">
+                解答する
+            </button>
+        </form>
+
+        {% if error_message %}
+            <p style="
+                color: #ff9b80;
+                margin-top: 10px;
+                font-weight: bold;
+            ">
+                {{ error_message }}
+            </p>
         {% endif %}
 
-    </div>
+    {% else %}
+        <p>現在出題できる問題がありません。</p>
+    {% endif %}
+
+</div>
+
 
 </div>
 
