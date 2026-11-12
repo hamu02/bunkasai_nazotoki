@@ -418,8 +418,12 @@ def register_element_nfc(request, element):
     team_name = request.session.get('team_name')
     if not team_name:
         return redirect('login')
+
     request.session['player_element'] = element
-    return redirect('player')
+
+    return render(request, 'escape_game/element_acquired.html', {
+        'element': element,
+    })
 
 
 def trigger_skill_nfc(request, element):

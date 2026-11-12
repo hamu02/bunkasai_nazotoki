@@ -1,0 +1,188 @@
+{% extends 'escape_game/base.html' %}
+{% block extra_css %}
+<style>
+:root{--element-color:#c9a4ff;--element-rgb:201,164,255}
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#03050c;font-family:'Hiragino Mincho ProN','Yu Mincho',serif}
+#ritual{position:fixed;inset:0;overflow:hidden;background:radial-gradient(ellipse at center,#101426 0%,#060811 55%,#020309 100%);isolation:isolate}
+#fx{position:absolute;inset:0;width:100%;height:100%;display:block}
+#sigil{position:absolute;left:50%;top:46%;width:min(88vw,68vh,500px);aspect-ratio:1;transform:translate(-50%,-50%);overflow:visible;filter:drop-shadow(0 0 5px var(--element-color));will-change:transform,opacity;opacity:0;animation:manifest 1.3s cubic-bezier(.1,.65,.2,1) forwards,sigilLeave .8s ease-in 3.45s forwards;pointer-events:none}
+#sigil .outer{transform-origin:200px 200px;animation:spin 24s linear infinite}
+#sigil .middle{transform-origin:200px 200px;animation:spinReverse 17s linear infinite}
+#sigil .inner{transform-origin:200px 200px;animation:spin 11s linear infinite}
+#sigil circle,#sigil path,#sigil polygon,#sigil line{fill:none;stroke:var(--element-color);vector-effect:non-scaling-stroke}
+#sigil .fine{stroke-width:.8;opacity:.65}#sigil .main{stroke-width:1.5;opacity:.95}#sigil .bright{stroke-width:2.1}
+#sigil text{fill:var(--element-color);font:12px Georgia,serif;letter-spacing:3px}
+#sigil .runic{font-size:15px;letter-spacing:0}
+#pulse{position:absolute;inset:0;background:radial-gradient(circle at 50% 46%,rgba(var(--element-rgb),.48),rgba(var(--element-rgb),.08) 24%,transparent 65%);opacity:0;pointer-events:none;animation:flash 1.5s ease-in-out 3.1s forwards}
+#result{position:absolute;left:0;right:0;top:46%;transform:translateY(-50%) scale(.86);text-align:center;padding:0 16px;box-sizing:border-box;opacity:0;z-index:3;animation:reveal .75s cubic-bezier(.18,1.2,.3,1) 4.15s forwards}
+#result .rule{height:1px;max-width:260px;margin:18px auto;background:linear-gradient(90deg,transparent,var(--element-color),transparent);box-shadow:0 0 15px var(--element-color)}
+#result .small{font:500 clamp(10px,2.6vw,13px) Georgia,serif;letter-spacing:.36em;color:var(--element-color)}
+#result .title{font-size:clamp(25px,7vw,43px);font-weight:700;line-height:1.55;color:#f8f6ff;text-shadow:0 0 10px var(--element-color),0 0 35px var(--element-color);letter-spacing:.06em}
+#result .name{color:var(--element-color)}
+#skip{position:absolute;right:16px;bottom:max(18px,env(safe-area-inset-bottom));z-index:5;border:1px solid rgba(255,255,255,.25);border-radius:30px;background:rgba(0,0,0,.28);color:#d8dbe8;padding:9px 16px;font:12px sans-serif;cursor:pointer}
+@keyframes manifest{0%{opacity:0;transform:translate(-50%,-50%) scale(.55) rotate(-18deg)}75%{opacity:1}100%{opacity:1;transform:translate(-50%,-50%) scale(1) rotate(0)}}
+@keyframes sigilLeave{0%{opacity:1;transform:translate(-50%,-50%) scale(1)}100%{opacity:0;transform:translate(-50%,-50%) scale(1.55)}}
+@keyframes spin{to{transform:rotate(360deg)}}@keyframes spinReverse{to{transform:rotate(-360deg)}}
+@keyframes flash{0%{opacity:0}40%{opacity:.28}100%{opacity:0}}
+@keyframes reveal{to{opacity:1;transform:translateY(-50%) scale(1)}}
+@media(prefers-reduced-motion:reduce){#sigil .outer,#sigil .middle,#sigil .inner{animation:none}}
+</style>
+{% endblock %}
+{% block content %}
+<div id="ritual">
+ <canvas id="fx" aria-hidden="true"></canvas>
+ <svg id="sigil" viewBox="0 0 400 400" aria-hidden="true">
+  <defs><path id="runePath" d="M200,200 m-177,0 a177,177 0 1,1 354,0 a177,177 0 1,1 -354,0"/></defs>
+  <g class="outer">
+   <circle class="bright" cx="200" cy="200" r="194"/><circle class="fine" cx="200" cy="200" r="188"/>
+   <circle class="main" cx="200" cy="200" r="164"/><circle class="fine" cx="200" cy="200" r="157"/>
+   <text class="runic"><textPath href="#runePath">ᚠ ᚢ ᚦ ᚨ ᚱ ᚲ ᚷ ᚹ ᚺ ᚾ ᛁ ᛃ ᛇ ᛈ ᛉ ᛊ ᛏ ᛒ ᛖ ᛗ ᛚ ᛜ ᛟ ᛞ ᚠ ᚢ ᚦ ᚨ ᚱ ᚲ ᚷ ᚹ ᚺ ᚾ ᛁ ᛃ ᛇ ᛈ ᛉ ᛊ ᛏ ᛒ ᛖ ᛗ ᛚ ᛜ ᛟ ᛞ</textPath></text>
+   <g id="outerMarks"></g>
+  </g>
+  <g class="middle">
+   <circle class="main" cx="200" cy="200" r="149"/><circle class="fine" cx="200" cy="200" r="141"/>
+   <polygon class="main" points="200,54 326.4,273 73.6,273"/>
+   <polygon class="main" points="200,346 73.6,127 326.4,127"/>
+   <polygon class="fine" points="200,65 335,200 200,335 65,200"/>
+   <circle class="fine" cx="200" cy="200" r="123"/>
+   <g id="middleMarks"></g>
+  </g>
+  <g class="inner">
+   <circle class="bright" cx="200" cy="200" r="103"/><circle class="fine" cx="200" cy="200" r="94"/>
+   <polygon class="main" points="200,103 297,200 200,297 103,200"/>
+   <polygon class="fine" points="200,107 284,249 116,249"/>
+   <polygon class="fine" points="200,293 116,151 284,151"/>
+   <circle class="main" cx="200" cy="200" r="63"/>
+   <g id="innerMarks"></g>
+  </g>
+  <circle class="bright" cx="200" cy="200" r="27"/><circle class="fine" cx="200" cy="200" r="18"/>
+  <path class="bright" d="M200 161 L209 191 L239 200 L209 209 L200 239 L191 209 L161 200 L191 191 Z"/>
+  <circle cx="200" cy="200" r="5" fill="var(--element-color)" stroke="none"/>
+ </svg>
+ <div id="pulse"></div>
+ <div id="result" role="status" aria-live="polite">
+  <div class="small">ELEMENT AWAKENED</div><div class="rule"></div>
+  <div class="title"><span class="name" id="element-name"></span>属性を獲得した！</div>
+  <div class="rule"></div><div class="small">THE POWER IS YOURS</div>
+ </div>
+ <button id="skip" type="button">スキップ ›</button>
+</div>
+<script>
+(() => {
+ const element = '{{ element|escapejs }}';
+ const configs = {
+  time:{name:'時間',color:'#c9a4ff',rgb:'201,164,255'},
+  grass:{name:'草',color:'#75e6a0',rgb:'117,230,160'},
+  fire:{name:'炎',color:'#ff9a4e',rgb:'255,154,78'},
+  water:{name:'水',color:'#62c5ff',rgb:'98,197,255'},
+  ice:{name:'氷',color:'#b3efff',rgb:'179,239,255'}
+ };
+ const config=configs[element]||configs.time;
+ document.documentElement.style.setProperty('--element-color',config.color);
+ document.documentElement.style.setProperty('--element-rgb',config.rgb);
+ document.getElementById('element-name').textContent=config.name;
+ const svgNS='http://www.w3.org/2000/svg';
+ function add(parent,tag,attrs){const el=document.createElementNS(svgNS,tag);for(const [k,v] of Object.entries(attrs))el.setAttribute(k,v);parent.appendChild(el);return el;}
+ for(let i=0;i<72;i++){
+  const a=i*Math.PI/36, c=Math.cos(a),s=Math.sin(a),major=i%6===0;
+  add(document.getElementById('outerMarks'),'line',{x1:200+c* (major?163:166),y1:200+s*(major?163:166),x2:200+c* (major?187:174),y2:200+s*(major?187:174),class:major?'main':'fine'});
+ }
+ for(let i=0;i<24;i++){
+  const a=i*Math.PI/12,c=Math.cos(a),s=Math.sin(a);
+  add(document.getElementById('middleMarks'),'circle',{cx:200+c*132,cy:200+s*132,r:i%3===0?3:1.6,class:'fine'});
+ }
+ for(let i=0;i<12;i++){
+  const a=i*Math.PI/6,c=Math.cos(a),s=Math.sin(a);
+  add(document.getElementById('innerMarks'),'line',{x1:200+c*67,y1:200+s*67,x2:200+c*91,y2:200+s*91,class:'fine'});
+ }
+ const canvas=document.getElementById('fx'),ctx=canvas.getContext('2d',{alpha:true});
+ let w=0,h=0,dpr=1,particles=[],running=true;
+ const start=performance.now(),duration=6200;
+ const redirect=()=>{if(!running)return;running=false;window.location.replace("{% url 'player' %}");};
+ document.getElementById('skip').addEventListener('click',redirect);
+ const timer=setTimeout(redirect,duration);
+ // スマホで高解像度Canvasを毎フレーム再描画しないため、最大1.5倍に制限
+ function resize(){
+  dpr=Math.min(window.devicePixelRatio||1,1.5);
+  w=window.innerWidth;h=window.innerHeight;
+  canvas.width=Math.round(w*dpr);canvas.height=Math.round(h*dpr);
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+ }
+ resize();window.addEventListener('resize',resize);
+ const maxParticles=115;
+ function spawn(count){
+  const cx=w*.5,cy=h*.46;
+  count=Math.min(count,maxParticles-particles.length);
+  for(let i=0;i<count;i++){
+   const a=Math.random()*Math.PI*2,r=Math.random()*Math.min(w,h)*.27;
+   let x=cx+Math.cos(a)*r,y=cy+Math.sin(a)*r;
+   let vx=0,vy=0;
+   if(element==='fire'){x=cx+(Math.random()-.5)*w*.5;y=cy+Math.random()*h*.32;vx=(Math.random()-.5)*.9;vy=-(1+Math.random()*2.8);}
+   else if(element==='water'){vx=Math.cos(a)*(1+Math.random()*3);vy=Math.sin(a)*(1+Math.random()*3);}
+   else if(element==='grass'){x=cx+(Math.random()-.5)*w*.75;y=h+Math.random()*50;vx=Math.sin(a)*.7;vy=-(1+Math.random()*2);}
+   else if(element==='ice'){vx=(Math.random()-.5)*1.5;vy=.35+Math.random()*1.5;}
+   else{vx=-Math.sin(a)*(1+Math.random()*1.8);vy=Math.cos(a)*(1+Math.random()*1.8);}
+   particles.push({x,y,vx,vy,a,age:0,life:55+Math.random()*65,size:1+Math.random()*2.4,seed:Math.random()*10});
+  }
+ }
+ let last=performance.now(),spawnCarry=0;
+ function frame(now){
+  if(!running)return;
+  const elapsed=now-start;
+  // 経過時間で動きを計算。描画FPSが変わっても粒子の速度が急変しない。
+  const dt=Math.min((now-last)/16.67,2);last=now;
+  ctx.clearRect(0,0,w,h);
+  const cx=w*.5,cy=h*.46;
+  if(elapsed<4000){
+   const rate=elapsed<1300?13:elapsed<3500?34:18;
+   spawnCarry+=rate*(dt/60);
+   const n=Math.floor(spawnCarry);
+   if(n){spawn(n);spawnCarry-=n;}
+  }
+  // 影のぼかしを粒子ごとに計算しない。光の色は共通で一度だけ設定する。
+  ctx.globalCompositeOperation='lighter';
+  ctx.shadowBlur=0;
+  ctx.fillStyle=config.color;ctx.strokeStyle=config.color;
+  ctx.lineWidth=1;
+  const alive=[];
+  for(const p of particles){
+   p.age+=dt;
+   if(element==='time'){
+    const dx=p.x-cx,dy=p.y-cy;
+    p.vx+=-dy*.00016*dt;p.vy+=dx*.00016*dt;
+   }else if(element==='fire'){p.vx+=Math.sin(p.age*.12+p.seed)*.025*dt;}
+   else if(element==='grass'){p.vx+=Math.sin(p.age*.035+p.seed)*.014*dt;}
+   else if(element==='water'){p.vy+=.025*dt;}
+   else if(element==='ice'){p.vx+=Math.sin(p.age*.05+p.seed)*.008*dt;}
+   p.x+=p.vx*dt;p.y+=p.vy*dt;
+   if(p.age>=p.life)continue;
+   alive.push(p);
+   const alpha=Math.max(0,Math.min(1,(p.life-p.age)/Math.min(30,p.life)))*.85;
+   ctx.globalAlpha=alpha;
+   // save()/restore()・translate()・rotate()を省いて直接描く
+   if(element==='ice'){
+    const sz=p.size*2;
+    ctx.beginPath();ctx.moveTo(p.x,p.y-sz);ctx.lineTo(p.x+sz*.45,p.y);
+    ctx.lineTo(p.x,p.y+sz);ctx.lineTo(p.x-sz*.45,p.y);ctx.closePath();ctx.stroke();
+   }else if(element==='grass'){
+    const sz=p.size*2.2;
+    ctx.beginPath();ctx.ellipse(p.x,p.y,p.size*.8,sz,Math.sin(p.age*.04+p.seed)*.35,0,Math.PI*2);ctx.fill();
+   }else if(element==='water'){
+    ctx.beginPath();ctx.arc(p.x,p.y,p.size,0,Math.PI*2);ctx.stroke();
+   }else if(element==='time'){
+    ctx.beginPath();ctx.arc(p.x,p.y,p.size*.8,0,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.moveTo(p.x,p.y);ctx.lineTo(p.x-p.vx*2.5,p.y-p.vy*2.5);ctx.stroke();
+   }else{
+    ctx.beginPath();ctx.ellipse(p.x,p.y,p.size*.7,p.size*2,0,0,Math.PI*2);ctx.fill();
+   }
+  }
+  particles=alive;
+  ctx.globalAlpha=1;
+  ctx.globalCompositeOperation='source-over';
+  requestAnimationFrame(frame);
+ }
+ requestAnimationFrame(frame);
+ window.addEventListener('pagehide',()=>{running=false;clearTimeout(timer);});
+})();
+</script>
+{% endblock %}
