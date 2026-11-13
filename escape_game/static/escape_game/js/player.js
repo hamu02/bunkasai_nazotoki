@@ -9,6 +9,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let remainingSecondsWhenPaused = 0;
     let isRedirecting = false;
     const initialStage = Number(wrapper?.dataset.stage || 0);
+    const initiallyStarted = wrapper?.dataset.started === 'yes';
+    const initialElement = wrapper?.dataset.element || 'none';
     const initialHints = wrapper?.dataset.hints || '';
 
     // タイマー描画機能
@@ -17,7 +19,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
         let totalSeconds = 0;
 
-        if (isPaused) {
+        if (!initiallyStarted && !targetTimestamp) {
+            totalSeconds = remainingSecondsWhenPaused;
+        } else if (isPaused) {
             totalSeconds = remainingSecondsWhenPaused;
         } else if (targetTimestamp) {
             const now = Date.now();
@@ -51,7 +55,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
                     if (
                         serverStage !== initialStage ||
-                        serverHints !== initialHints
+                        serverHints !== initialHints ||
+                        (data.has_started && !initiallyStarted) ||
+                        data.element !== initialElement ||
+                        data.player_team_mismatch ||
+                        data.awaiting_personal_finish && serverStage !== initialStage
                     ) {
                         isRedirecting = true;
                         window.location.reload();

@@ -1,6 +1,6 @@
 
 document.addEventListener('DOMContentLoaded', () => {
-    const teamStates = [null, null];
+    let teamStates = [null, null];
 
     function formatTime(totalSeconds) {
         totalSeconds = Math.max(0, Math.ceil(totalSeconds));
@@ -22,7 +22,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function renderMonitor() {
-        for (let i = 0; i < 2; i++) {
+        for (let i = 0; i < teamStates.length; i++) {
             const slot = document.getElementById(`slot-${i}`);
             if (!slot) continue;
 
@@ -82,7 +82,17 @@ document.addEventListener('DOMContentLoaded', () => {
             const teams = data.teams || [];
             const now = Date.now();
 
-            for (let i = 0; i < 2; i++) {
+            const container = document.querySelector('.monitors-container');
+            const count = Math.max(2, teams.length);
+            while (container.children.length < count) {
+                const slot = document.createElement('div');
+                slot.id = `slot-${container.children.length}`;
+                slot.className = 'monitor-slot empty';
+                container.appendChild(slot);
+            }
+            while (container.children.length > count) container.lastElementChild.remove();
+            teamStates = Array(count).fill(null);
+            for (let i = 0; i < count; i++) {
                 const team = teams[i];
 
                 teamStates[i] = team ? {

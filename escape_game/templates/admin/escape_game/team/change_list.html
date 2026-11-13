@@ -1,0 +1,14 @@
+{% extends "admin/change_list.html" %}
+{% block content %}
+<div style="padding:16px;margin:0 0 18px;border:2px solid #cc9951;border-radius:10px;background:#f8f3e9;color:#333;">
+  <h2 style="color:#333;">⚙️ 本番運営スイッチ（進行中の班一覧）</h2>
+  <form method="post" action="{% url 'admin:escape_game_team_settings' %}">
+    {% csrf_token %}
+    <label style="display:block;margin:10px 0;color:#333;"><input type="checkbox" name="allow_extra_teams" {% if festival_settings.allow_extra_teams %}checked{% endif %}> 2班の同時プレイ上限を解除</label>
+    <label style="display:block;margin:10px 0;color:#333;"><input type="checkbox" name="allow_duplicate_sets" {% if festival_settings.allow_duplicate_sets %}checked{% endif %}> 問題セットの重複を許可（注意：別班と同じ問題が出ます）</label>
+    <button type="submit" class="button default">スイッチを保存</button>
+    <p style="color:#9c4b22;margin:10px 0 0;">※ 上限を解除しても問題セットが足りなければ参加できません。両方を解除すると3班以上の参加が可能です。</p>
+  </form>
+</div>
+{{ block.super }}
+{% endblock %}

@@ -19,7 +19,19 @@ class Team(models.Model):
         ('C', 'Cセット'),
     ]
 
+    OUTCOME_CHOICES = [
+        ('', '進行中・準備中'),
+        ('cleared', 'クリア'),
+        ('timeout', '時間切れ'),
+        ('interrupted', '管理者による中断'),
+        ('abandoned', '参加者不在'),
+    ]
     name = models.CharField(max_length=100, unique=True)
+    run_number = models.PositiveIntegerField(default=1, verbose_name='プレイ回数')
+    outcome = models.CharField(max_length=20, choices=OUTCOME_CHOICES, blank=True, default='', verbose_name='終了結果')
+    ended_at = models.DateTimeField(null=True, blank=True, verbose_name='終了日時')
+    final_solved_at = models.DateTimeField(null=True, blank=True)
+
     element = models.CharField(max_length=20, choices=ELEMENT_CHOICES, default='none')
     current_stage = models.IntegerField(default=1)
 
@@ -86,7 +98,7 @@ class Team(models.Model):
 
 
 class GameSlot(models.Model):
-    """同時プレイ枠。最大2件だけ作り、使用中の問題セットも一意に管理する。"""
+    """同時プレイ枠。運営スイッチで3枠以上に増やせる。"""
     slot_number = models.PositiveSmallIntegerField(unique=True)
     team = models.OneToOneField(
         Team,
@@ -95,13 +107,13 @@ class GameSlot(models.Model):
         on_delete=models.SET_NULL,
         related_name='game_slot',
     )
-    # unique + NULL許可により、同じセットを2枠で同時使用できないようにする
+    # 重複の可否はFestivalSettingsと割り当て処理で管理する。
     set_code = models.CharField(
         max_length=1,
         choices=Team.SET_CHOICES,
         null=True,
         blank=True,
-        unique=True,
+        unique=False,
     )
 
     class Meta:
@@ -130,3 +142,52 @@ class Mystery(models.Model):
 
     def __str__(self):
         return f"{self.title}"
+
+
+class Player(models.Model):
+    """ブラウザごとの固定ID。再参加しても同じ番号を使用する。"""
+    ELEMENT_CHOICES = Team.ELEMENT_CHOICES
+    team = models.ForeignKey(Team, on_delete=models.SET_NULL, null=True, blank=True, related_name='players')
+    run_number = models.PositiveIntegerField(default=1)
+    element = models.CharField(max_length=20, choices=ELEMENT_CHOICES, default='none')
+    last_seen = models.DateTimeField(default=timezone.now)
+    final_answer_submitted = models.BooleanField(default=False)
+
+    def __str__(self):
+        return f'プレイヤー #{self.pk} ({self.team.name if self.team_id else "未所属"})'
+
+
+class GameRecord(models.Model):
+    """班を再利用・削除しても残る、1プレイごとの記録。"""
+    team_pk = models.PositiveIntegerField()
+    team_name = models.CharField(max_length=100)
+    run_number = models.PositiveIntegerField()
+    outcome = models.CharField(max_length=20, choices=Team.OUTCOME_CHOICES)
+    assigned_set = models.CharField(max_length=1, blank=True)
+    player_ids = models.JSONField(default=list)
+    player_count = models.PositiveIntegerField(default=0)
+    player_details = models.JSONField(default=list)
+    started_at = models.DateTimeField(null=True, blank=True)
+    ended_at = models.DateTimeField(default=timezone.now)
+    elapsed_seconds = models.PositiveIntegerField(default=0)
+    reached_stage = models.PositiveIntegerField(default=1)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=['team_pk', 'run_number'], name='unique_team_play_record')]
+        ordering = ['-ended_at']
+
+    def __str__(self):
+        return f'{self.team_name} ({self.run_number}回目) - {self.get_outcome_display()}'
+
+
+class FestivalSettings(models.Model):
+    """運営用スイッチ。常にpk=1の1行だけを使用。"""
+    allow_extra_teams = models.BooleanField(default=False, verbose_name='2班制限を解除')
+    allow_duplicate_sets = models.BooleanField(default=False, verbose_name='同時に同じ問題セットを許可')
+
+    @classmethod
+    def current(cls):
+        return cls.objects.get_or_create(pk=1)[0]
+
+    def __str__(self):
+        return '文化祭運営設定'

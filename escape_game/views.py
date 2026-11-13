@@ -3,11 +3,13 @@ import random
 
 from django.db import IntegrityError, transaction
 from django.db.models import F
+from datetime import timedelta
+from django.views.decorators.http import require_POST
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
-from .models import GameSlot, Mystery, Team
+from .models import GameSlot, Mystery, Team, Player, GameRecord, FestivalSettings
 
 
 # A/B/Cそれぞれ3問。管理画面のMystery.stage_numberをこの番号で登録する。
@@ -19,34 +21,107 @@ PROBLEM_SETS = {
 MAX_SIMULTANEOUS_TEAMS = 2
 
 
+VALID_ELEMENTS = {'time', 'grass', 'fire', 'water', 'ice'}
+
+
+def get_session_player(request):
+    player_id = request.session.get('player_id')
+    if not player_id:
+        return None
+    return Player.objects.select_related('team').filter(pk=player_id).first()
+
+
+def session_team(request):
+    player = get_session_player(request)
+    if player and player.team_id and player.run_number == player.team.run_number:
+        return player.team
+    return None
+
+
+def touch_player(request):
+    player = get_session_player(request)
+    if player:
+        Player.objects.filter(pk=player.pk).update(last_seen=timezone.now())
+    return player
+
+
 def team_is_cleared(team):
-    mysteries = team.get_assigned_mysteries()
-    return bool(mysteries) and team.current_stage > len(mysteries)
+    if team.outcome == 'cleared':
+        return True
+    return bool(team.get_assigned_mysteries()) and team.current_stage > len(team.get_assigned_mysteries())
 
 
-def release_team_slot(team, mark_inactive=True):
-    """班の問題セットと同時プレイ枠を解放する。"""
-    GameSlot.objects.filter(team=team).update(team=None, set_code=None)
-    if mark_inactive:
-        Team.objects.filter(pk=team.pk).update(is_active=False)
+def snapshot_players(team):
+    players = list(Player.objects.filter(team=team, run_number=team.run_number).order_by('pk'))
+    return [dict(id=p.pk, element=p.element, final_answer_submitted=p.final_answer_submitted) for p in players]
+
+
+def update_record_players(team):
+    details = snapshot_players(team)
+    GameRecord.objects.filter(team_pk=team.pk, run_number=team.run_number).update(
+        player_ids=[p['id'] for p in details], player_count=len(details), player_details=details
+    )
+
+
+def finish_team(team, outcome):
+    """終了判定をDBに一度だけ保存し、枠を解放して履歴を作成する。"""
+    if outcome not in {'cleared', 'timeout', 'interrupted', 'abandoned'}:
+        raise ValueError('invalid outcome')
+    with transaction.atomic():
+        team = Team.objects.select_for_update().get(pk=team.pk)
+        if team.outcome:
+            return team
+        now = timezone.now()
+        team.outcome = outcome
+        team.ended_at = now
         team.is_active = False
+        if outcome == 'cleared':
+            team.final_solved_at = now
+        team.save(update_fields=['outcome', 'ended_at', 'is_active', 'final_solved_at', 'last_accessed'])
+        details = snapshot_players(team)
+        elapsed = max(0, int((now - team.start_time).total_seconds())) if team.start_time else 0
+        GameRecord.objects.update_or_create(team_pk=team.pk, run_number=team.run_number, defaults={
+            'team_name': team.name, 'outcome': outcome, 'assigned_set': team.assigned_set,
+            'player_ids': [p['id'] for p in details], 'player_count': len(details),
+            'player_details': details, 'started_at': team.start_time,
+            'ended_at': now, 'elapsed_seconds': elapsed, 'reached_stage': team.current_stage,
+        })
+        GameSlot.objects.filter(team=team).update(team=None, set_code=None)
+    return team
 
 
 def cleanup_finished_slots():
-    """時間切れ・クリア済みの班が枠を占有し続けないようにする。"""
-    slots = GameSlot.objects.select_related('team').exclude(team__isnull=True)
-    for slot in slots:
-        team = slot.team
-        if not team.is_active or team.remaining_seconds <= 0 or team_is_cleared(team):
-            release_team_slot(team)
+    """終了判定を統一し、放置班は安全な猶予後にアーカイブする。"""
+    now = timezone.now()
+    # 古い終了済み班に残った枠も解放（既存データとの互換性）。
+    GameSlot.objects.filter(team__is_active=False).update(team=None, set_code=None)
+    GameSlot.objects.filter(team__isnull=True).exclude(set_code__isnull=True).update(set_code=None)
+    for team in Team.objects.filter(is_active=True):
+        if team_is_cleared(team):
+            finish_team(team, 'cleared')
+        elif team.start_time and team.remaining_seconds <= 0:
+            finish_team(team, 'timeout')
+        else:
+            # 準備中15分、開始後5分、全員からアクセスがなければ枠を解放。
+            threshold = now - timedelta(minutes=5 if team.start_time else 15)
+            latest = Player.objects.filter(team=team, run_number=team.run_number).order_by('-last_seen').first()
+            if latest and latest.last_seen < threshold:
+                finish_team(team, 'abandoned')
+            elif not latest and team.last_accessed < threshold:
+                finish_team(team, 'abandoned')
 
 
 def reset_team_for_new_game(team):
-    """同じ合言葉を新しい回で使う場合に、前回の進行状態を初期化する。"""
+    """履歴を残して同じ合言葉を次のプレイに再利用する。"""
+    if team.outcome:
+        team.run_number += 1
     team.current_stage = 1
     team.assigned_set = ''
     team.assigned_mystery_ids = '[]'
     team.is_active = False
+    team.outcome = ''
+    team.ended_at = None
+    team.final_solved_at = None
     team.time_limit_seconds = 600
     team.start_time = None
     team.bonus_seconds = 0
@@ -64,257 +139,201 @@ def reset_team_for_new_game(team):
 
 
 def start_or_resume_team(team):
-    """既存班なら同じ枠で再開。新しい班なら空き枠と未使用セットを割り当てる。"""
-    # 2枠を必ず用意する。slot_numberはuniqueなので重複作成されない。
+    """参加枠とセットを割り当て。運営スイッチで上限・重複を制御。"""
     for number in range(1, MAX_SIMULTANEOUS_TEAMS + 1):
         GameSlot.objects.get_or_create(slot_number=number)
 
     with transaction.atomic():
-        slots = list(GameSlot.objects.select_for_update().order_by('slot_number'))
-
-        # 班がいない枠に残っている問題セットを解放
-        GameSlot.objects.filter(team__isnull=True).update(set_code=None)
-
-        # 更新した状態を取得し直す
-        slots = list(GameSlot.objects.select_for_update().order_by('slot_number'))
-
-        # 同じ班の別プレイヤー（最大5人）は、既存の割り当てを共有する。
-        existing_slot = next((slot for slot in slots if slot.team_id == team.pk), None)
-        if existing_slot and team.is_active:
+        team = Team.objects.select_for_update().get(pk=team.pk)
+        if team.is_active and not team.outcome and GameSlot.objects.filter(team=team).exists():
             return True
-
-        # 前回終了済み、または管理者が強制終了した班は新しい回として初期化。
-        if existing_slot:
-            GameSlot.objects.filter(pk=existing_slot.pk).update(team=None, set_code=None)
-        if team.is_active or team.start_time or team.assigned_mystery_ids != '[]':
+        if team.outcome or team.assigned_set or team.start_time:
             reset_team_for_new_game(team)
 
-        free_slots = [slot for slot in slots if slot.team_id is None]
-        if not free_slots:
+        config = FestivalSettings.current()
+        if not config.allow_extra_teams and GameSlot.objects.filter(team__isnull=False).count() >= MAX_SIMULTANEOUS_TEAMS:
             return False
+        slots = list(GameSlot.objects.select_for_update().order_by('slot_number'))
+        free_slot = next((slot for slot in slots if slot.team_id is None), None)
+        if not free_slot:
+            if not config.allow_extra_teams:
+                return False
+            next_number = max((slot.slot_number for slot in slots), default=0) + 1
+            free_slot = GameSlot.objects.create(slot_number=next_number)
 
-        used_sets = set(
-            GameSlot.objects.filter(team__isnull=False)
-            .exclude(set_code__isnull=True)
-            .values_list("set_code", flat=True)
-        )
-        available_sets = [code for code in PROBLEM_SETS if code not in used_sets]
-
-        # 3問そろっているセットだけ候補にする。不足セットへの誤割り当てを防ぐ。
+        used_sets = set(Team.objects.filter(is_active=True).exclude(pk=team.pk).values_list('assigned_set', flat=True))
         valid_sets = []
-        ids_by_set = {}
-        for code in available_sets:
-            ids = list(
-                Mystery.objects.filter(stage_number__in=PROBLEM_SETS[code], is_published=True)
-                .order_by('stage_number')
-                .values_list('id', flat=True)
-            )
+        for code, stage_numbers in PROBLEM_SETS.items():
+            if not config.allow_duplicate_sets and code in used_sets:
+                continue
+            ids = list(Mystery.objects.filter(stage_number__in=stage_numbers, is_published=True)
+                       .order_by('stage_number').values_list('id', flat=True))
             if len(ids) == 3:
-                valid_sets.append(code)
-                ids_by_set[code] = ids
-
-        random.shuffle(valid_sets)
-        for slot in free_slots:
-            for code in list(valid_sets):
-                try:
-                    # Unique set_codeは、同時ログイン時の二重割り当てに対する最後の防波堤。
-                    with transaction.atomic():
-                        updated = GameSlot.objects.filter(
-                            pk=slot.pk, team__isnull=True, set_code__isnull=True
-                        ).update(team=team, set_code=code)
-                except IntegrityError:
-                    updated = 0
-
-                if updated:
-                    team.current_stage = 1
-                    team.assigned_set = code
-                    team.assigned_mystery_ids = json.dumps(ids_by_set[code])
-                    team.is_active = True
-                    # 全員の説明が終わるまでカウントダウンは開始しない。
-                    team.start_time = None
-                    team.bonus_seconds = 0
-                    team.is_paused = False
-                    team.paused_at = None
-                    team.skill_time_used = False
-                    team.skill_ice_used = False
-                    team.skill_grass_used = False
-                    team.skill_fire_used = False
-                    team.skill_water_used = False
-                    team.last_event = ''
-                    team.active_hint_stage = 0
-                    team.active_hint_elements = []
-                    team.save()
-                    return True
-
-                valid_sets.remove(code)
-
-        return False
+                valid_sets.append((code, ids))
+        if not valid_sets:
+            return False
+        code, ids = random.choice(valid_sets)
+        free_slot.team = team
+        free_slot.set_code = code
+        free_slot.save(update_fields=['team', 'set_code'])
+        team.assigned_set = code
+        team.assigned_mystery_ids = json.dumps(ids)
+        team.is_active = True
+        team.start_time = None
+        team.save()
+        return True
 
 
 def login_view(request):
     error_message = None
-
     if request.method == 'POST':
         passcode = request.POST.get('passcode', '').strip()
         if passcode:
             cleanup_finished_slots()
-
             with transaction.atomic():
                 team, created = Team.objects.get_or_create(name=passcode)
-                if not created:
-                    Team.objects.filter(pk=team.pk).update(visitor_count=F('visitor_count') + 1)
-                    team.refresh_from_db()
-
-                # 同じ班の5人は既存枠を共有。新しい班は空き枠が必要。
                 if start_or_resume_team(team):
-                    if request.session.get('team_name') != team.name:
-                        request.session.pop('player_element', None)
+                    team.refresh_from_db()
+                    player = get_session_player(request)
+                    if not player:
+                        player = Player.objects.create(team=team, run_number=team.run_number)
+                    else:
+                        # ブラウザIDを引き継ぎ、参加する回の属性は未設定に戻す。
+                        player.team = team
+                        player.run_number = team.run_number
+                        player.element = 'none'
+                        player.final_answer_submitted = False
+                        player.last_seen = timezone.now()
+                        player.save()
+                    request.session['player_id'] = player.pk
                     request.session['team_name'] = team.name
-                    return redirect('player' if team.start_time else 'ready')
-
+                    request.session['player_element'] = 'normal'
+                    Team.objects.filter(pk=team.pk).update(visitor_count=F('visitor_count') + 1 if not created else 1)
+                    return redirect('player')
                 if created:
                     team.delete()
-                occupied_count = GameSlot.objects.filter(team__isnull=False).count()
-                if occupied_count >= MAX_SIMULTANEOUS_TEAMS:
-                    error_message = '現在2班がプレイ中です。どちらかの班が終了してから参加してください。'
+                config = FestivalSettings.current()
+                if not config.allow_extra_teams and GameSlot.objects.filter(team__isnull=False).count() >= MAX_SIMULTANEOUS_TEAMS:
+                    error_message = '現在2班がプレイ中です。管理画面から上限を解除できます。'
                 else:
-                    error_message = '公開中の問題が3問そろったセットがありません。管理画面の公開設定を確認してください。'
+                    error_message = '使用可能な問題セットがありません。問題の公開設定または問題重複の許可を確認してください。'
         else:
             error_message = '合言葉を入力してください。'
-
     return render(request, 'escape_game/login.html', {'error_message': error_message})
 
 
 def ready_view(request):
-    """属性の説明・読み込みを済ませ、班のスタートを待つ画面。"""
-    team_name = request.session.get('team_name')
-    if not team_name:
-        return redirect('login')
-    team = get_object_or_404(Team, name=team_name)
-    if not team.is_active or team.start_time:
-        return redirect('player')
-    return render(request, 'escape_game/ready.html', {
-        'team': team,
-        'player_element': request.session.get('player_element', 'normal'),
-    })
+    return redirect('player')
 
 
+@require_POST
 def start_game_view(request):
-    """POSTで一度だけ開始。5人が同時に押しても開始時刻は変えない。"""
-    if request.method != 'POST':
-        return redirect('ready')
-    team_name = request.session.get('team_name')
-    if not team_name:
+    player = get_session_player(request)
+    team = session_team(request)
+    if not player or not team:
         return redirect('login')
     with transaction.atomic():
-        team = get_object_or_404(Team.objects.select_for_update(), name=team_name)
-        if team.is_active and team.start_time is None and team.get_assigned_mysteries():
+        team = Team.objects.select_for_update().get(pk=team.pk)
+        player.refresh_from_db()
+        if (team.is_active and not team.outcome and team.start_time is None
+                and player.element in VALID_ELEMENTS and team.get_assigned_mysteries()):
             team.start_time = timezone.now()
             team.save(update_fields=['start_time', 'last_accessed'])
     return redirect('player')
 
 
-# プレイヤー画面：スマホごとに設定された属性のテンプレートを表示する
-# 属性別HTML・セッションの仕組みは今回変更しない。
 def player_view(request):
-    team_name = request.session.get('team_name')
-    if not team_name:
+    team = session_team(request)
+    player = touch_player(request)
+    if not team or not player:
         return redirect('login')
-
-    team = get_object_or_404(Team, name=team_name)
-
-    if not team.is_active:
-        return render(request, 'escape_game/game_over.html', {'team': team})
-
-    if team.start_time is None:
-        return redirect('ready')
-
-    if team.remaining_seconds <= 0:
-        release_team_slot(team)
-        return render(request, 'escape_game/game_over.html', {'team': team})
+    cleanup_finished_slots()
+    team.refresh_from_db()
+    player.refresh_from_db()
 
     assigned_mysteries = team.get_assigned_mysteries()
-
-    if assigned_mysteries and team.current_stage > len(assigned_mysteries):
-        release_team_slot(team)
-        return render(request, 'escape_game/game_clear.html', {'team': team})
-
-    current_mystery = None
-    if 1 <= team.current_stage <= len(assigned_mysteries):
-        current_mystery = assigned_mysteries[team.current_stage - 1]
-
-    
+    total = len(assigned_mysteries)
     error_message = None
+    awaiting_personal_finish = team.outcome == 'cleared' and not player.final_answer_submitted
 
-    if request.method == 'POST':
-        user_answer = request.POST.get('answer', '').strip().lower()
+    if team.outcome == 'cleared' and not awaiting_personal_finish:
+        return redirect('game_clear')
+    if team.outcome and team.outcome != 'cleared':
+        return redirect('game_over')
 
-        if current_mystery and user_answer == current_mystery.answer.strip().lower():
-            solved_stage = team.current_stage
+    if team.start_time and not team.outcome and team.remaining_seconds <= 0:
+        finish_team(team, 'timeout')
+        return redirect('game_over')
 
-            team.current_stage += 1
-            team.save(update_fields=['current_stage', 'last_accessed'])
+    if request.method == 'POST' and team.start_time and player.element in VALID_ELEMENTS:
+        answer = request.POST.get('answer', '').strip().casefold()
+        with transaction.atomic():
+            team = Team.objects.select_for_update().get(pk=team.pk)
+            player = Player.objects.select_for_update().get(pk=player.pk)
+            assigned_mysteries = team.get_assigned_mysteries()
+            total = len(assigned_mysteries)
+            if team.outcome == 'cleared' and not player.final_answer_submitted and total:
+                if answer == assigned_mysteries[-1].answer.strip().casefold():
+                    player.final_answer_submitted = True
+                    player.save(update_fields=['final_answer_submitted', 'last_seen'])
+                    update_record_players(team)
+                    return redirect('game_clear')
+                error_message = '答えが違うようだ...'
+            elif not team.outcome and team.remaining_seconds <= 0:
+                finish_team(team, 'timeout')
+                return redirect('game_over')
+            elif not team.outcome and 1 <= team.current_stage <= total:
+                current = assigned_mysteries[team.current_stage - 1]
+                if answer == current.answer.strip().casefold():
+                    solved_stage = team.current_stage
+                    team.current_stage += 1
+                    team.save(update_fields=['current_stage', 'last_accessed'])
+                    if team.current_stage > total:
+                        player.final_answer_submitted = True
+                        player.save(update_fields=['final_answer_submitted'])
+                        finish_team(team, 'cleared')
+                        return redirect('game_clear')
+                    request.session['correct_stage'] = solved_stage
+                    request.session['correct_set'] = team.assigned_set
+                    request.session['correct_team'] = team.name
+                    return redirect('correct')
+                error_message = '答えが違うようだ...'
 
-            # 最終問題ならクリア画面へ
-            if team.current_stage > len(assigned_mysteries):
-                return redirect('game_clear')
+    # 開始前は問題を隠し、元の未設定画面・属性別画面で開始を待つ。
+    if not team.start_time:
+        current_mystery = None
+    elif team.outcome == 'cleared' and awaiting_personal_finish:
+        current_mystery = assigned_mysteries[-1] if assigned_mysteries else None
+    else:
+        current_mystery = assigned_mysteries[team.current_stage - 1] if 1 <= team.current_stage <= total else None
 
-            # 正解メッセージ画面用の情報を保存
-            request.session['correct_stage'] = solved_stage
-            request.session['correct_set'] = team.assigned_set
-            request.session['correct_team'] = team.name
-
-            return redirect('correct')
-
-        # 不正解の場合
-        error_message = '答えが違うようだ...'
-
-
-    player_element = request.session.get('player_element', 'normal')
-
-    template_name = 'escape_game/player_normal.html'
-    if player_element == 'time':
-        template_name = 'escape_game/player_time.html'
-    elif player_element == 'grass':
-        template_name = 'escape_game/player_grass.html'
-    elif player_element == 'fire':
-        template_name = 'escape_game/player_fire.html'
-    elif player_element == 'ice':
-        template_name = 'escape_game/player_ice.html'
-    elif player_element == 'water':
-        template_name = 'escape_game/player_water.html'
-
+    template_names = {
+        'time': 'escape_game/player_time.html', 'grass': 'escape_game/player_grass.html',
+        'fire': 'escape_game/player_fire.html', 'ice': 'escape_game/player_ice.html',
+        'water': 'escape_game/player_water.html',
+    }
     active_hints = []
-
     if current_mystery and team.active_hint_stage == team.current_stage:
-        hint_settings = {
-            'ice': ('❄️ 氷のヒント', current_mystery.hint_ice),
-            'grass': ('🌿 草のヒント', current_mystery.hint_grass),
-            'fire': ('🔥 炎のヒント', current_mystery.hint_fire),
-        }
-
-        for element in team.active_hint_elements:
-            if element in hint_settings:
-                title, content = hint_settings[element]
-                active_hints.append({
-                    'title': title,
-                    'content': content or 'ヒントはまだ登録されていません。',
-                })
-
-    return render(request, template_name, {
-        'team': team,
-        'mystery': current_mystery,
-        'error_message': error_message,
-        'total_stages': len(assigned_mysteries),
-        'active_hints': active_hints,
+        for element, title, content in [
+            ('ice', '❄️ 氷のヒント', current_mystery.hint_ice),
+            ('grass', '🌿 草のヒント', current_mystery.hint_grass),
+            ('fire', '🔥 炎のヒント', current_mystery.hint_fire),
+        ]:
+            if element in team.active_hint_elements:
+                active_hints.append({'title': title, 'content': content or 'ヒントはまだ登録されていません。'})
+    return render(request, template_names.get(player.element, 'escape_game/player_normal.html'), {
+        'team': team, 'mystery': current_mystery, 'error_message': error_message,
+        'total_stages': total, 'active_hints': active_hints,
+        'player': player, 'is_preparing': team.start_time is None,
+        'awaiting_personal_finish': awaiting_personal_finish,
+        'display_stage': min(team.current_stage, total),
     })
 
-def correct_view(request):
-    team_name = request.session.get('team_name')
-    if not team_name:
-        return redirect('login')
 
-    team = get_object_or_404(Team, name=team_name)
+def correct_view(request):
+    team = session_team(request)
+    if not team:
+        return redirect('login')
 
     if not team.is_active or team.remaining_seconds <= 0:
         return redirect('player')
@@ -386,36 +405,33 @@ def correct_view(request):
 
 def get_team_state(request, team_name):
     team = get_object_or_404(Team, name=team_name)
-    assigned_mysteries = team.get_assigned_mysteries()
-    total_mysteries = len(assigned_mysteries)
+    if team.is_active:
+        cleanup_finished_slots()
+        team.refresh_from_db()
+    player = touch_player(request)
+    player_team_mismatch = bool(player and (player.team_id != team.pk or player.run_number != team.run_number))
+    if player_team_mismatch:
+        player = None
+    personal_pending = team.outcome == 'cleared' and player is not None and not player.final_answer_submitted
     remaining = team.remaining_seconds
-    is_cleared = bool(total_mysteries) and team.current_stage > total_mysteries
-
-    if team.is_active and (remaining <= 0 or is_cleared):
-        release_team_slot(team)
-
-    total_allowed_seconds = team.time_limit_seconds + team.bonus_seconds
-    target_timestamp = None
+    allowed = team.time_limit_seconds + team.bonus_seconds
+    target = None
     if team.start_time:
         if team.is_paused and team.paused_at:
-            elapsed = (team.paused_at - team.start_time).total_seconds()
-            rem = max(0, total_allowed_seconds - elapsed)
-            target_timestamp = (timezone.now().timestamp() + rem) * 1000
+            rem = max(0, allowed - (team.paused_at - team.start_time).total_seconds())
+            target = (timezone.now().timestamp() + rem) * 1000
         else:
-            target_timestamp = (team.start_time.timestamp() + total_allowed_seconds) * 1000
-
+            target = (team.start_time.timestamp() + allowed) * 1000
     return JsonResponse({
-        'stage': team.current_stage,
-        'time_remaining': remaining,
-        'remaining_seconds': remaining,
-        'is_paused': team.is_paused,
-        'has_started': team.start_time is not None,
-        'last_event': team.last_event,
-        'element': team.element,
-        'is_game_over': remaining <= 0 or (not team.is_active and not is_cleared),
-        'is_cleared': is_cleared,
-        'target_timestamp': target_timestamp,
-        'active_hint_stage': team.active_hint_stage,
+        'stage': team.current_stage, 'time_remaining': remaining, 'remaining_seconds': remaining,
+        'is_paused': team.is_paused, 'has_started': team.start_time is not None,
+        'last_event': team.last_event, 'element': player.element if player else 'none',
+        'is_game_over': team.outcome in ('timeout', 'interrupted', 'abandoned'),
+        'is_cleared': team.outcome == 'cleared' and not personal_pending,
+        'team_cleared': team.outcome == 'cleared',
+        'player_team_mismatch': player_team_mismatch,
+        'awaiting_personal_finish': personal_pending,
+        'target_timestamp': target, 'active_hint_stage': team.active_hint_stage,
         'active_hint_elements': team.active_hint_elements,
     })
 
@@ -427,22 +443,13 @@ def monitor_view(request, team_name):
 
 def active_teams_api(request):
     cleanup_finished_slots()
-    slots = GameSlot.objects.select_related('team').exclude(team__isnull=True).order_by('slot_number')
     teams_data = []
-    for slot in slots:
-        team = slot.team
-        if not team.is_active:
-            continue
-        assigned_mysteries = team.get_assigned_mysteries()
+    for team in Team.objects.filter(is_active=True).order_by('pk'):
         teams_data.append({
-            'name': team.name,
-            'stage': team.current_stage,
-            'time_remaining': team.remaining_seconds,
-            'is_paused': team.is_paused,
-            'has_started': team.start_time is not None,
-            'is_cleared': team_is_cleared(team),
-            'is_game_over': team.remaining_seconds <= 0,
-            'assigned_set': team.assigned_set,
+            'name': team.name, 'stage': team.current_stage,
+            'time_remaining': team.remaining_seconds, 'is_paused': team.is_paused,
+            'has_started': team.start_time is not None, 'is_cleared': False,
+            'is_game_over': False, 'assigned_set': team.assigned_set,
         })
     return JsonResponse({'teams': teams_data})
 
@@ -452,23 +459,27 @@ def dual_monitor_view(request):
 
 
 def register_element_nfc(request, element):
-    team_name = request.session.get('team_name')
-    if not team_name:
+    team = session_team(request)
+    player = get_session_player(request)
+    if not team or not player:
         return redirect('login')
-
+    if element not in VALID_ELEMENTS:
+        return redirect('player')
+    player.element = element
+    player.last_seen = timezone.now()
+    player.save(update_fields=['element', 'last_seen'])
     request.session['player_element'] = element
-
-    return render(request, 'escape_game/element_acquired.html', {
-        'element': element,
-    })
+    return render(request, 'escape_game/element_acquired.html', {'element': element})
 
 
 def trigger_skill_nfc(request, element):
-    team_name = request.session.get('team_name')
-    if not team_name:
+    team = session_team(request)
+    player = touch_player(request)
+    if not team or not player:
         return redirect('login')
 
-    player_element = request.session.get('player_element', 'normal')
+    team_name = team.name
+    player_element = player.element
 
     def result(message, team):
         return render(request, 'escape_game/skill_result.html', {
@@ -591,11 +602,13 @@ def trigger_skill_nfc(request, element):
 
 
 def water_select_view(request):
-    team_name = request.session.get('team_name')
-    if not team_name:
+    team = session_team(request)
+    player = touch_player(request)
+    if not team or not player:
         return redirect('login')
 
-    if request.session.get('player_element') != 'water':
+    team_name = team.name
+    if player.element != 'water':
         return redirect('player')
 
     skill_fields = {
@@ -659,37 +672,42 @@ def water_select_view(request):
 
 
 def game_over_view(request):
-    team_name = request.session.get('team_name')
-    team = get_object_or_404(Team, name=team_name) if team_name else None
-    if team:
-        release_team_slot(team)
+    team = session_team(request)
+    if not team:
+        return redirect('login')
+    if team.outcome == 'cleared':
+        return redirect('player')
+    if not team.outcome:
+        if team.start_time and team.remaining_seconds <= 0:
+            team = finish_team(team, 'timeout')
+        else:
+            return redirect('player')
     return render(request, 'escape_game/game_over.html', {'team': team})
 
 
 def game_clear_view(request):
-    team_name = request.session.get('team_name')
-    team = get_object_or_404(Team, name=team_name) if team_name else None
-    if team:
-        release_team_slot(team)
+    team = session_team(request)
+    player = touch_player(request)
+    if not team:
+        return redirect('login')
+    if team.outcome != 'cleared' or (player and not player.final_answer_submitted):
+        return redirect('player')
     return render(request, 'escape_game/game_clear.html', {'team': team})
 
 
 def admin_teams_status_api(request):
-    teams = Team.objects.all()
+    if not request.user.is_staff:
+        return JsonResponse({'error': 'forbidden'}, status=403)
     data = []
-    for team in teams:
+    for team in Team.objects.all():
         secs = team.remaining_seconds
-        mins = secs // 60
-        seconds = secs % 60
         t = '⏱️' if team.skill_time_used else '・'
         i = '❄️' if team.skill_ice_used else '・'
         g = '🌿' if team.skill_grass_used else '・'
         f = '🔥' if team.skill_fire_used else '・'
-        skill_summary = f'時:{t} 氷:{i} 草:{g} 炎:{f}'
         data.append({
-            'name': team.name,
-            'stage': team.current_stage,
-            'remaining_formatted': f'{mins}分 {seconds:02d}秒',
-            'skill_summary': skill_summary,
+            'name': team.name, 'stage': team.current_stage,
+            'remaining_formatted': f'{secs // 60}分 {secs % 60:02d}秒',
+            'skill_summary': f'時:{t} 氷:{i} 草:{g} 炎:{f}',
         })
     return JsonResponse({'teams': data})

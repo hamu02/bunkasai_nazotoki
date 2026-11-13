@@ -11,6 +11,8 @@
 <div class="game-wrapper {% block theme_class %}theme-normal{% endblock %}"
      data-team-name="{{ team.name }}"
      data-stage="{{ team.current_stage }}"
+     data-started="{% if team.start_time %}yes{% else %}no{% endif %}"
+     data-element="{{ player.element }}"
      data-hints="{% if team.active_hint_stage == team.current_stage %}{{ team.active_hint_elements|join:',' }}{% endif %}">
 
     <!-- 1. 最上部ヘッダー -->
@@ -27,6 +29,7 @@
         </div>
     </header>
 
+    <div style="text-align:center;opacity:.85;margin:8px 0;">プレイヤー番号：#{{ player.pk }}</div>
     <!-- 2. 上部ステータスエリア -->
     <div class="status-grid">
         <!-- 残り時間タイマー -->
@@ -35,7 +38,7 @@
             <div class="timer-display">
                 <span class="hourglass">⏳</span>
                 <span id="player-timer">--:--</span>
-                <span class="status-tag">進行中</span>
+                <span class="status-tag">{% if is_preparing %}準備中{% else %}進行中{% endif %}</span>
             </div>
         </div>
 
@@ -50,6 +53,23 @@
         </div>
     </div>
 
+
+{% if is_preparing %}
+<div style="text-align:center;background:#221c19;border:2px solid #b9914e;border-radius:16px;padding:24px 16px;margin:20px 0;color:#f4e7c8;">
+  <h2>📖 ゲーム開始の準備</h2>
+  {% if player.element == 'none' %}
+    <p>まだ属性が未設定です。NFC・QRを読み込んで属性を獲得してください。</p>
+    <p style="color:#ffdb9a;">属性を読み込むとスタートボタンが表示されます。</p>
+  {% else %}
+    <p>属性の読み込み完了！ 全員の説明が終わったらスタートしてください。</p>
+    <form method="post" action="{% url 'start_game' %}">
+      {% csrf_token %}
+      <button type="submit" style="font-size:20px;padding:15px 30px;border:0;border-radius:12px;background:#d9b66e;color:#24180c;font-weight:bold;">▶ ゲームスタート</button>
+    </form>
+  {% endif %}
+  <p>開始ボタンが押されるまでタイマーは進みません。誰かが開始すると同じ班の画面も進みます。</p>
+</div>
+{% endif %}
 
 <!-- 魔法で解放されたヒント -->
 {% if active_hints %}
@@ -86,6 +106,7 @@
 {% endif %}
 
 
+{% if not is_preparing %}
 <!-- 3. 謎解き出題エリア -->
 <div class="mystery-container"
      style="
@@ -108,7 +129,7 @@
             letter-spacing: 2px;
             font-weight: bold;
         ">
-            STAGE {{ team.current_stage }} / {{ total_stages }}
+            STAGE {{ display_stage }} / {{ total_stages }}
         </div>
 
         <!-- 問題タイトル -->
@@ -133,6 +154,9 @@
             {{ mystery.statement|safe }}
         </div>
 
+        {% if awaiting_personal_finish %}
+          <p style="color:#a8e6b2;">🎉 班はクリア済み！ あなたも最後の答えを入力して、自分のクリアを完成させよう。</p>
+        {% endif %}
         <!-- 解答入力フォーム -->
         <form method="POST"
               style="
@@ -188,6 +212,7 @@
     {% endif %}
 
 </div>
+{% endif %}
 
 
 </div>

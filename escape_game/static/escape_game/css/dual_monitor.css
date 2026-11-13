@@ -10,7 +10,7 @@ body {
     font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
     width: 100vw;
     height: 100vh;
-    overflow: hidden;
+    overflow: auto;
 }
 
 .dual-monitor-wrapper {
@@ -36,11 +36,13 @@ body {
     display: flex;
     flex-direction: column;
     gap: 15px;
-    height: calc(100vh - 70px);
+    min-height: calc(100vh - 70px);
+    height: auto;
 }
 
 .monitor-slot {
-    flex: 1;
+    flex: 1 0 30vh;
+    min-height: 180px;
     background: rgba(10, 16, 30, 0.9);
     border: 2px solid #00f3ff;
     border-radius: 16px;

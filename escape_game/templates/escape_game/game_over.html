@@ -9,7 +9,7 @@
 <div class="over-wrapper">
     <div class="over-card">
         <div class="skull-icon">💀</div>
-        <div><span class="over-badge">TIME UP</span></div>
+        <div><span class="over-badge">{% if team.outcome == "interrupted" %}STOPPED{% elif team.outcome == "abandoned" %}SESSION ENDED{% else %}TIME UP{% endif %}</span></div>
         <h1 class="over-title">GAME OVER</h1>
         
         <div class="divider"></div>
@@ -18,7 +18,7 @@
             チーム <span class="team-name">「{{ team.name }}」</span>
         </div>
         <p class="over-desc">
-            制限時間が終了しました…<br>
+            {% if team.outcome == "interrupted" %}管理者によりゲームが中断されました。{% elif team.outcome == "abandoned" %}参加者がいなくなったため終了しました。{% else %}制限時間が終了しました…{% endif %}<br>
             迷宮の深い闇に呑まれ、脱出することはできなかった。
         </p>
     </div>

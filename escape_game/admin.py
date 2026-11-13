@@ -1,8 +1,12 @@
 import json
 from django.contrib import admin, messages
 from django.db import transaction
+from django.http import HttpResponseRedirect
+from django.urls import path, reverse
+from django.utils.html import format_html
 
-from .models import GameSlot, Mystery, Team
+from .models import GameSlot, Mystery, Team, Player, GameRecord, FestivalSettings
+from .views import finish_team, PROBLEM_SETS
 
 from django import forms
 from django.utils import timezone
@@ -11,9 +15,9 @@ from django.utils import timezone
 
 @admin.action(description='選択した班を強制終了して問題セットを解放')
 def force_release_teams(modeladmin, request, queryset):
-    team_ids = list(queryset.values_list('id', flat=True))
-    GameSlot.objects.filter(team_id__in=team_ids).update(team=None, set_code=None)
-    queryset.update(is_active=False)
+    for team in queryset.filter(is_active=True):
+        finish_team(team, 'interrupted')
+    messages.success(request, '選択した班を中断として記録し、プレイ枠を解放しました。')
 
 
 @admin.action(description='問題セットをAに変更')
@@ -64,8 +68,8 @@ def change_problem_set(request, queryset, set_code):
                 )
                 continue
 
-            if GameSlot.objects.filter(
-                set_code=set_code
+            if not FestivalSettings.current().allow_duplicate_sets and GameSlot.objects.filter(
+                set_code=set_code, team__isnull=False
             ).exclude(pk=slot.pk).exists():
                 messages.error(
                     request,
@@ -123,6 +127,7 @@ class TeamAdminForm(forms.ModelForm):
     )
     assigned_set = forms.ChoiceField(
         label='Assigned set',
+        required=False,
         choices=[
             ('A', 'Aセット'),
             ('B', 'Bセット'),
@@ -172,9 +177,9 @@ class TeamAdminForm(forms.ModelForm):
             'C': [7, 8, 9],
         }
 
-        if Mystery.objects.filter(
+        if (set_code != team._loaded_assigned_set and Mystery.objects.filter(
             stage_number__in=stage_numbers[set_code], is_published=True
-        ).count() != 3:
+        ).count() != 3):
             raise forms.ValidationError(
                 f'{set_code}セットの問題が3問そろっていません。'
             )
@@ -182,9 +187,9 @@ class TeamAdminForm(forms.ModelForm):
         # 他の班が使用中のセットには変更できない
         slot = GameSlot.objects.filter(team=team).first()
 
-        if slot:
-            if GameSlot.objects.filter(
-                set_code=set_code
+        if slot and set_code != team._loaded_assigned_set:
+            if not FestivalSettings.current().allow_duplicate_sets and GameSlot.objects.filter(
+                set_code=set_code, team__isnull=False
             ).exclude(pk=slot.pk).exists():
                 raise forms.ValidationError(
                     f'{set_code}セットは別の班が使用中です。'
@@ -209,16 +214,15 @@ class TeamAdminForm(forms.ModelForm):
             Mystery.objects.filter(
                 stage_number__in=stage_numbers[set_code], is_published=True
             ).order_by('stage_number')
-        )
+        ) if set_code else []
 
         # 変更前の問題セット・問題番号
         old_set = self.instance._loaded_assigned_set
         old_stage = self.instance._loaded_current_stage
 
         team.assigned_set = set_code
-        team.assigned_mystery_ids = json.dumps(
-            [m.id for m in mysteries]
-        )
+        if set_code and (set_code != old_set or team.assigned_mystery_ids in ('', '[]')):
+            team.assigned_mystery_ids = json.dumps([m.id for m in mysteries])
         team.current_stage = stage
 
         # 問題セットか問題番号が変更されたらヒントを消す
@@ -292,6 +296,8 @@ class TeamAdmin(admin.ModelAdmin):
                 'assigned_set',
                 'current_stage',
                 'is_active',
+                'run_number',
+                'outcome',
             ),
         }),
 
@@ -329,12 +335,17 @@ class TeamAdmin(admin.ModelAdmin):
         'assigned_set',
         'current_stage',
         'get_remaining_minutes',
-        'visitor_count',
+        'participant_count',
+        'outcome',
         'skill_status_summary',
         'last_accessed',
         'is_paused',
     )
-    readonly_fields = ('remaining_seconds', 'visitor_count', 'start_time', 'last_accessed')
+    readonly_fields = ('remaining_seconds', 'visitor_count', 'start_time', 'last_accessed', 'is_active', 'run_number', 'outcome')
+    change_list_template = 'admin/escape_game/team/change_list.html'
+
+    def has_delete_permission(self, request, obj=None):
+        return False
     search_fields = ('name',)
     list_filter = ('is_active', 'assigned_set', 'is_paused')
     actions = (
@@ -348,6 +359,34 @@ class TeamAdmin(admin.ModelAdmin):
     grant_water_skill,
     grant_ice_skill,
     )
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).filter(is_active=True)
+
+    def get_urls(self):
+        custom = [path('settings/', self.admin_site.admin_view(self.settings_view), name='escape_game_team_settings')]
+        return custom + super().get_urls()
+
+    def settings_view(self, request):
+        if not self.has_change_permission(request):
+            from django.core.exceptions import PermissionDenied
+            raise PermissionDenied
+        if request.method == 'POST':
+            config = FestivalSettings.current()
+            config.allow_extra_teams = request.POST.get('allow_extra_teams') == 'on'
+            config.allow_duplicate_sets = request.POST.get('allow_duplicate_sets') == 'on'
+            config.save()
+            messages.warning(request, '運営スイッチを更新しました。重複許可中は同じ問題を別の班に出す可能性があります。')
+        return HttpResponseRedirect(reverse('admin:escape_game_team_changelist'))
+
+    def changelist_view(self, request, extra_context=None):
+        context = dict(extra_context or {})
+        context['festival_settings'] = FestivalSettings.current()
+        return super().changelist_view(request, extra_context=context)
+
+    @admin.display(description='現在の参加人数')
+    def participant_count(self, obj):
+        return obj.players.filter(run_number=obj.run_number).count()
 
     @admin.display(description='残り時間')
     def get_remaining_minutes(self, obj):
@@ -421,3 +460,58 @@ class MysteryAdmin(admin.ModelAdmin):
         fire = '🔥' if obj.hint_fire else '－'
         return f'{ice} {grass} {fire}'
 
+
+
+@admin.register(Player)
+class PlayerAdmin(admin.ModelAdmin):
+    list_display = ('id', 'team', 'run_number', 'element', 'last_seen', 'final_answer_submitted')
+    list_display_links = ('id',)
+    list_editable = ('team', 'element')
+    list_filter = ('team', 'element')
+    search_fields = ('=id', 'team__name')
+    readonly_fields = ('run_number', 'last_seen', 'final_answer_submitted')
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+    def has_add_permission(self, request):
+        return False
+
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        if db_field.name == 'team':
+            kwargs['queryset'] = Team.objects.filter(is_active=True)
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
+
+    def save_model(self, request, obj, form, change):
+        if obj.team_id:
+            obj.run_number = obj.team.run_number
+            obj.final_answer_submitted = False
+        obj.last_seen = timezone.now()
+        super().save_model(request, obj, form, change)
+
+    def save_formset(self, request, form, formset, change):
+        super().save_formset(request, form, formset, change)
+
+
+
+@admin.register(GameRecord)
+class GameRecordAdmin(admin.ModelAdmin):
+    list_display = ('team_name', 'run_number', 'outcome', 'player_count', 'assigned_set', 'started_at', 'ended_at', 'elapsed_seconds')
+    list_filter = ('outcome', 'assigned_set', 'ended_at')
+    search_fields = ('team_name', '=team_pk')
+    readonly_fields = ('team_pk', 'team_name', 'run_number', 'outcome', 'assigned_set', 'player_ids', 'player_count', 'player_details', 'started_at', 'ended_at', 'elapsed_seconds', 'reached_stage')
+    def has_add_permission(self, request):
+        return False
+    def has_change_permission(self, request, obj=None):
+        return False
+    def has_view_permission(self, request, obj=None):
+        return request.user.is_staff
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(FestivalSettings)
+class FestivalSettingsAdmin(admin.ModelAdmin):
+    list_display = ('allow_extra_teams', 'allow_duplicate_sets')
+    def has_add_permission(self, request):
+        return not FestivalSettings.objects.exists()
