@@ -39,13 +39,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
             let remaining = state.remainingSeconds;
 
-            if (!team.is_paused && !team.is_game_over && !team.is_cleared) {
+            if (team.has_started && !team.is_paused && !team.is_game_over && !team.is_cleared) {
                 const elapsed = (Date.now() - state.syncedAt) / 1000;
                 remaining = Math.max(0, remaining - elapsed);
             }
 
             const warningClass = remaining <= 180 ? 'timer-warning' : '';
-            const stageText = team.is_cleared
+            const stageText = !team.has_started ? '準備中' : team.is_cleared
                 ? 'CLEAR!'
                 : team.is_game_over
                     ? 'GAME OVER'

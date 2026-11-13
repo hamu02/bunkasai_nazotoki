@@ -44,7 +44,7 @@ def change_problem_set(request, queryset, set_code):
         for team in queryset.select_for_update():
             mysteries = list(
                 Mystery.objects.filter(
-                    stage_number__in=stage_numbers[set_code]
+                    stage_number__in=stage_numbers[set_code], is_published=True
                 ).order_by('stage_number')
             )
 
@@ -173,7 +173,7 @@ class TeamAdminForm(forms.ModelForm):
         }
 
         if Mystery.objects.filter(
-            stage_number__in=stage_numbers[set_code]
+            stage_number__in=stage_numbers[set_code], is_published=True
         ).count() != 3:
             raise forms.ValidationError(
                 f'{set_code}セットの問題が3問そろっていません。'
@@ -207,7 +207,7 @@ class TeamAdminForm(forms.ModelForm):
 
         mysteries = list(
             Mystery.objects.filter(
-                stage_number__in=stage_numbers[set_code]
+                stage_number__in=stage_numbers[set_code], is_published=True
             ).order_by('stage_number')
         )
 
@@ -248,6 +248,38 @@ class TeamAdminForm(forms.ModelForm):
 
 
 
+# 管理画面から選択した班に属性スキルの再使用権を付与する。
+# 既存の「使用済み」フラグを戻すだけなのでDB構造は変更しない。
+@admin.action(description='⏳ 時間の能力を再付与（再使用可能にする）')
+def grant_time_skill(modeladmin, request, queryset):
+    count = queryset.update(skill_time_used=False)
+    messages.success(request, f'{count}班の時間の能力を再使用可能にしました。')
+
+
+@admin.action(description='🌿 草の能力を再付与（再使用可能にする）')
+def grant_grass_skill(modeladmin, request, queryset):
+    count = queryset.update(skill_grass_used=False)
+    messages.success(request, f'{count}班の草の能力を再使用可能にしました。')
+
+
+@admin.action(description='🔥 炎の能力を再付与（再使用可能にする）')
+def grant_fire_skill(modeladmin, request, queryset):
+    count = queryset.update(skill_fire_used=False)
+    messages.success(request, f'{count}班の炎の能力を再使用可能にしました。')
+
+
+@admin.action(description='💧 水の能力を再付与（再使用可能にする）')
+def grant_water_skill(modeladmin, request, queryset):
+    count = queryset.update(skill_water_used=False)
+    messages.success(request, f'{count}班の水の能力を再使用可能にしました。')
+
+
+@admin.action(description='❄️ 氷の能力を再付与（再使用可能にする）')
+def grant_ice_skill(modeladmin, request, queryset):
+    count = queryset.update(skill_ice_used=False)
+    messages.success(request, f'{count}班の氷の能力を再使用可能にしました。')
+
+
 @admin.register(Team)
 class TeamAdmin(admin.ModelAdmin):
     form = TeamAdminForm
@@ -272,7 +304,7 @@ class TeamAdmin(admin.ModelAdmin):
             ),
         }),
 
-        ('✨ スキル使用状況（チェックあり＝使用済み）', {
+        ('✨ 能力の再付与（チェックを外すと再使用可能）', {
             'fields': (
                 'skill_time_used',
                 'skill_grass_used',
@@ -310,6 +342,11 @@ class TeamAdmin(admin.ModelAdmin):
     change_to_set_a,
     change_to_set_b,
     change_to_set_c,
+    grant_time_skill,
+    grant_grass_skill,
+    grant_fire_skill,
+    grant_water_skill,
+    grant_ice_skill,
     )
 
     @admin.display(description='残り時間')
@@ -344,10 +381,12 @@ class MysteryAdmin(admin.ModelAdmin):
         'stage_number',
         'title',
         'answer',
+        'is_published',
         'hint_status',
     )
 
-    list_filter = ('stage_number',)
+    list_filter = ('stage_number', 'is_published')
+    list_editable = ('is_published',)
     ordering = ('stage_number',)
 
     fieldsets = (
@@ -358,6 +397,7 @@ class MysteryAdmin(admin.ModelAdmin):
                 'statement',
                 'image',
                 'answer',
+                'is_published',
             )
         }),
         ('❄️ 氷の魔法：単純なヒント', {

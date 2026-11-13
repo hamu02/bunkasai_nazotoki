@@ -1,0 +1,38 @@
+{% extends 'escape_game/base.html' %}
+{% block content %}
+<div style="max-width:580px;margin:8vh auto;padding:26px 20px;text-align:center;background:#171a29;color:#f8f1dc;border:2px solid #b9914e;border-radius:18px;box-sizing:border-box;">
+  <h1 style="font-size:clamp(24px,6vw,34px);">📖 ゲーム開始の準備</h1>
+  <p>班：{{ team.name }}</p>
+  {% if player_element == 'normal' %}
+    <p style="color:#ffdf96;">まだ属性を読み込んでいません。各自、属性のNFC・QRを読み込んでください。</p>
+  {% else %}
+    <p style="color:#a8e6b2;">属性の読み込み完了！</p>
+  {% endif %}
+  <p style="line-height:1.8;">全員が属性を読み込み、説明を聞き終わってから<br>スタートボタンを押してください。</p>
+  <p>開始するまで10分のタイマーは進みません。</p>
+  {% if player_element != 'normal' %}
+    <form method="post" action="{% url 'start_game' %}">
+      {% csrf_token %}
+      <button type="submit" style="font-size:22px;font-weight:bold;padding:16px 36px;background:#d9b66e;border:0;border-radius:12px;color:#24180c;cursor:pointer;">▶ ゲームスタート</button>
+    </form>
+  {% endif %}
+  <p style="font-size:13px;opacity:.8;">誰か1人がスタートすると、同じ班の画面も自動で進みます。</p>
+</div>
+<script>
+(function(){
+  {% url 'team_state' team.name as state_url %}
+  const stateUrl = "{{ state_url|escapejs }}";
+  async function checkStarted(){
+    try {
+      const response = await fetch(stateUrl, {cache:'no-store'});
+      if(!response.ok) return;
+      const data = await response.json();
+      if(data.has_started) window.location.replace("{% url 'player' %}");
+      else if(data.is_game_over || data.is_cleared) window.location.replace("{% url 'player' %}");
+    }catch(e){ console.warn('開始待機の通信エラー',e); }
+  }
+  setInterval(checkStarted,2000);
+  checkStarted();
+})();
+</script>
+{% endblock %}

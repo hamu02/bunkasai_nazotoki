@@ -120,6 +120,7 @@ class Mystery(models.Model):
     statement = models.TextField(verbose_name="問題文（HTMLタグ可）")
     image = models.ImageField(upload_to='mysteries/', blank=True, null=True, verbose_name="謎の画像")
     answer = models.CharField(max_length=100, verbose_name="正解")
+    is_published = models.BooleanField(default=True, verbose_name="公開する（完成済み）", help_text="未完成ならチェックを外す。新しく開始する班への出題から除外されます。")
 
     hint_ice = models.TextField(blank=True, null=True, verbose_name="氷のヒント（単純なヒント）")
     hint_grass = models.TextField(blank=True, null=True, verbose_name="草のヒント（アナグラム等）")

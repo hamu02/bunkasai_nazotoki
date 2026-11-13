@@ -58,9 +58,9 @@ def reset_team_for_new_game(team):
     team.skill_fire_used = False
     team.skill_water_used = False
     team.last_event = ''
-    team.save()
     team.active_hint_stage = 0
     team.active_hint_elements = []
+    team.save()
 
 
 def start_or_resume_team(team):
@@ -105,7 +105,7 @@ def start_or_resume_team(team):
         ids_by_set = {}
         for code in available_sets:
             ids = list(
-                Mystery.objects.filter(stage_number__in=PROBLEM_SETS[code])
+                Mystery.objects.filter(stage_number__in=PROBLEM_SETS[code], is_published=True)
                 .order_by('stage_number')
                 .values_list('id', flat=True)
             )
@@ -130,7 +130,8 @@ def start_or_resume_team(team):
                     team.assigned_set = code
                     team.assigned_mystery_ids = json.dumps(ids_by_set[code])
                     team.is_active = True
-                    team.start_time = timezone.now()
+                    # 全員の説明が終わるまでカウントダウンは開始しない。
+                    team.start_time = None
                     team.bonus_seconds = 0
                     team.is_paused = False
                     team.paused_at = None
@@ -140,9 +141,9 @@ def start_or_resume_team(team):
                     team.skill_fire_used = False
                     team.skill_water_used = False
                     team.last_event = ''
-                    team.save()
                     team.active_hint_stage = 0
                     team.active_hint_elements = []
+                    team.save()
                     return True
 
                 valid_sets.remove(code)
@@ -166,8 +167,10 @@ def login_view(request):
 
                 # 同じ班の5人は既存枠を共有。新しい班は空き枠が必要。
                 if start_or_resume_team(team):
+                    if request.session.get('team_name') != team.name:
+                        request.session.pop('player_element', None)
                     request.session['team_name'] = team.name
-                    return redirect('player')
+                    return redirect('player' if team.start_time else 'ready')
 
                 if created:
                     team.delete()
@@ -175,11 +178,40 @@ def login_view(request):
                 if occupied_count >= MAX_SIMULTANEOUS_TEAMS:
                     error_message = '現在2班がプレイ中です。どちらかの班が終了してから参加してください。'
                 else:
-                    error_message = '問題セットが不足しています。管理画面でステージ番号1〜9の問題を3問ずつ登録してください。'
+                    error_message = '公開中の問題が3問そろったセットがありません。管理画面の公開設定を確認してください。'
         else:
             error_message = '合言葉を入力してください。'
 
     return render(request, 'escape_game/login.html', {'error_message': error_message})
+
+
+def ready_view(request):
+    """属性の説明・読み込みを済ませ、班のスタートを待つ画面。"""
+    team_name = request.session.get('team_name')
+    if not team_name:
+        return redirect('login')
+    team = get_object_or_404(Team, name=team_name)
+    if not team.is_active or team.start_time:
+        return redirect('player')
+    return render(request, 'escape_game/ready.html', {
+        'team': team,
+        'player_element': request.session.get('player_element', 'normal'),
+    })
+
+
+def start_game_view(request):
+    """POSTで一度だけ開始。5人が同時に押しても開始時刻は変えない。"""
+    if request.method != 'POST':
+        return redirect('ready')
+    team_name = request.session.get('team_name')
+    if not team_name:
+        return redirect('login')
+    with transaction.atomic():
+        team = get_object_or_404(Team.objects.select_for_update(), name=team_name)
+        if team.is_active and team.start_time is None and team.get_assigned_mysteries():
+            team.start_time = timezone.now()
+            team.save(update_fields=['start_time', 'last_accessed'])
+    return redirect('player')
 
 
 # プレイヤー画面：スマホごとに設定された属性のテンプレートを表示する
@@ -193,6 +225,9 @@ def player_view(request):
 
     if not team.is_active:
         return render(request, 'escape_game/game_over.html', {'team': team})
+
+    if team.start_time is None:
+        return redirect('ready')
 
     if team.remaining_seconds <= 0:
         release_team_slot(team)
@@ -374,6 +409,7 @@ def get_team_state(request, team_name):
         'time_remaining': remaining,
         'remaining_seconds': remaining,
         'is_paused': team.is_paused,
+        'has_started': team.start_time is not None,
         'last_event': team.last_event,
         'element': team.element,
         'is_game_over': remaining <= 0 or (not team.is_active and not is_cleared),
@@ -403,6 +439,7 @@ def active_teams_api(request):
             'stage': team.current_stage,
             'time_remaining': team.remaining_seconds,
             'is_paused': team.is_paused,
+            'has_started': team.start_time is not None,
             'is_cleared': team_is_cleared(team),
             'is_game_over': team.remaining_seconds <= 0,
             'assigned_set': team.assigned_set,
@@ -453,8 +490,8 @@ def trigger_skill_nfc(request, element):
             name=team_name,
         )
 
-        if not team.is_active or team.remaining_seconds <= 0:
-            msg = 'このゲームはすでに終了しています。'
+        if not team.is_active or team.start_time is None or team.remaining_seconds <= 0:
+            msg = 'ゲーム開始後に魔法を使用できます。'
             return result(msg, team)
 
         assigned_mysteries = team.get_assigned_mysteries()
@@ -574,7 +611,7 @@ def water_select_view(request):
             name=team_name,
         )
 
-        if not team.is_active or team.remaining_seconds <= 0:
+        if not team.is_active or team.start_time is None or team.remaining_seconds <= 0:
             return redirect('player')
 
         if team.skill_water_used:
